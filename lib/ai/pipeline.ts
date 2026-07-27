@@ -4,12 +4,28 @@
 // plus editDoc() for the chat loop.
 
 import { hashId, slugId } from "../memory/markdown";
-import { loadMemory, mergeEntities, resolveResume, saveMemory, saveSession } from "../memory/store";
+import type { Bucket } from "../memory/store";
+import {
+  listSourceFiles,
+  loadMemory,
+  mergeEntities,
+  recordAbsorbed,
+  resolveResume,
+  resolveSourceFile,
+  saveMemory,
+  saveSession,
+} from "../memory/store";
 import type { Entity } from "../memory/types";
 import { collectDropped, reconcileOrigins } from "../resume/diff";
 import type { ResumeDoc } from "../resume/model";
 import { docToText } from "../resume/model";
 import { parseResume, renderBlocks } from "../resume/parse";
+import {
+  SUPPORTED_EXTENSIONS,
+  extensionOf,
+  extractFile,
+  isSupported,
+} from "../sources/extract";
 import { isDemo, structuredCall } from "./client";
 import type { IntakeResult } from "./demo";
 import { demoChatReply, demoIntake, demoIntakeFromDoc, demoTailor, demoTarget } from "./demo";
@@ -133,6 +149,60 @@ export async function ingestResume(resumeName: string): Promise<IngestOutcome> {
     sourceLabel: `resume ${resumeName}`,
     preParsed: demoIntakeFromDoc(doc),
   });
+}
+
+/**
+ * Absorb one source document — the primary way information enters memory.
+ * Resumes route through the structural parser; everything else (research
+ * summaries, notes, transcripts) is prose and goes in as text.
+ */
+export async function absorbFile(args: {
+  name: string;
+  bucket: Bucket;
+}): Promise<IngestOutcome & { file: string; warning: string | null }> {
+  const files = await listSourceFiles();
+  const file = files.find((f) => f.name === args.name && f.bucket === args.bucket);
+  if (!file) throw new Error(`File not found: ${args.name}`);
+
+  const resolved = await resolveSourceFile(args.name, args.bucket);
+  if (!resolved) throw new Error(`File not found: ${args.name}`);
+  if (!isSupported(args.name)) {
+    throw new Error(
+      `Unsupported file type. Supported: ${SUPPORTED_EXTENSIONS.join(", ")}`
+    );
+  }
+
+  // A resume in data/resumes/ carries structure worth preserving; a prose
+  // document does not, so it takes the simpler text path.
+  const isResume = args.bucket === "resumes" && extensionOf(args.name) === ".docx";
+  let outcome: IngestOutcome;
+  let warning: string | null = null;
+
+  if (isResume) {
+    outcome = await ingestResume(args.name);
+  } else {
+    const extracted = await extractFile(resolved);
+    warning = extracted.warning;
+    if (!extracted.text) {
+      throw new Error(
+        extracted.warning ?? "No text could be read from that file."
+      );
+    }
+    outcome = await ingest({
+      text: extracted.text,
+      sourceLabel: args.name,
+    });
+  }
+
+  await recordAbsorbed(`${args.bucket}/${args.name}`, {
+    sha: file.sha,
+    absorbedAt: new Date().toISOString(),
+    entities: outcome.addedEntities,
+    facts: outcome.addedFacts,
+    items: outcome.addedItems,
+  });
+
+  return { ...outcome, file: args.name, warning };
 }
 
 // ---------- tailoring ----------

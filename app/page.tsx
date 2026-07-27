@@ -98,7 +98,7 @@ export default function Home() {
             {mode === "intake" ? "Intake — add to memory" : "Enhance — tailor to a posting"}
           </h2>
           {mode === "intake" ? (
-            <IntakePanel resumes={resumes} onIngested={loadMemory} />
+            <IntakePanel onIngested={loadMemory} />
           ) : (
             <EnhancePanel
               resumes={resumes}

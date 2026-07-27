@@ -17,9 +17,17 @@ cannot write a number you never gave it.
 
 ## The two modes
 
-**Intake** — the only job is getting information *in*. Paste a brain-dump, a
-project description, an old performance review, or absorb an entire `.docx`.
-Everything becomes structured entities in `data/memory/master.md`.
+**Intake** — the only job is getting information *in*, and the unit of intake
+is a **file**. Drop in a research summary, a list of everything you did in
+high school, project write-ups, transcripts, old resumes — `.docx`, `.pdf`,
+`.md`, `.txt`. Each one is read into structured entities in
+`data/memory/master.md`.
+
+The file library tracks every document's state: *not absorbed*, *in memory ·
+14 facts*, or *changed — re-absorb* when you edit it. Absorbing is additive and
+safe to repeat; identical facts are deduplicated by content hash, so
+re-absorbing an edited file adds only what's new. Typing text directly is still
+there, just secondary — for the number you only just remembered.
 
 **Enhance** — pick a base resume, paste a posting, get a rendered tailored
 resume with a chat beside it. Save writes a **new** `.docx`; your original is
@@ -139,8 +147,9 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Drop a resume into `data/resumes/` (created on first run), open **Intake**,
-absorb it, then switch to **Enhance**.
+Open **Intake**, drag your documents onto the drop zone (they land in
+`data/sources/`), and click absorb. Put a base resume in `data/resumes/` —
+that's the layout you tailor *from*. Then switch to **Enhance**.
 
 For real analysis:
 
@@ -158,6 +167,7 @@ export are all real in both modes — only judgment is faked. Model defaults to
 ## Architecture
 
 ```
+lib/sources/   text extraction for .docx / .pdf / .md / .txt
 lib/memory/    master.md store · markdown parse/serialize · graph index + ranking
 lib/resume/    ResumeDoc model · .docx parse · origin reconciliation · .docx export
 lib/ai/        Claude client · prompts · schemas · pipeline · code-side audit

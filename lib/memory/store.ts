@@ -1,10 +1,13 @@
 // Storage seam: the only module allowed to touch the filesystem. Layout:
 //
-//   data/memory/master.md   the knowledge base (source of truth)
-//   data/resumes/*.docx     your resumes, read-only — never modified
-//   data/exports/*.docx     resumes this app generates (new files only)
-//   data/sessions/*.json    tailoring sessions (mockup + chat + rationale)
+//   data/memory/master.md    the knowledge base (source of truth)
+//   data/memory/sources.json ledger of which files have been absorbed
+//   data/sources/*           documents you feed the knowledge base
+//   data/resumes/*.docx      base resumes you tailor from, read-only
+//   data/exports/*.docx      resumes this app generates (new files only)
+//   data/sessions/*.json     tailoring sessions (mockup + chat + rationale)
 
+import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { parseMemory, serializeMemory } from "./markdown";
@@ -14,12 +17,18 @@ import { EMPTY_MEMORY } from "./types";
 const DATA_DIR = path.join(process.cwd(), "data");
 const MEMORY_DIR = path.join(DATA_DIR, "memory");
 const MASTER_PATH = path.join(MEMORY_DIR, "master.md");
+const LEDGER_PATH = path.join(MEMORY_DIR, "sources.json");
+const SOURCES_DIR = path.join(DATA_DIR, "sources");
 const RESUMES_DIR = path.join(DATA_DIR, "resumes");
 const EXPORTS_DIR = path.join(DATA_DIR, "exports");
 const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 
+export const SOURCES_DIR_LABEL = "data/sources";
+export const RESUMES_DIR_LABEL = "data/resumes";
+
 async function ensureDirs(): Promise<void> {
   await fs.mkdir(MEMORY_DIR, { recursive: true });
+  await fs.mkdir(SOURCES_DIR, { recursive: true });
   await fs.mkdir(RESUMES_DIR, { recursive: true });
   await fs.mkdir(EXPORTS_DIR, { recursive: true });
   await fs.mkdir(SESSIONS_DIR, { recursive: true });
@@ -108,6 +117,141 @@ export function mergeEntities(memory: Memory, incoming: Entity[]): {
   }
 
   return { memory, addedEntities, addedFacts, addedItems };
+}
+
+// ---------- source documents ----------
+
+/** Where a file lives. Resumes double as sources but keep their own folder. */
+export type Bucket = "sources" | "resumes";
+
+function dirFor(bucket: Bucket): string {
+  return bucket === "resumes" ? RESUMES_DIR : SOURCES_DIR;
+}
+
+/**
+ * Filenames arriving from the UI are KEYS, never paths. Everything is
+ * basename'd and re-checked against a directory listing before use.
+ */
+function safeName(filename: string): string {
+  return path.basename(filename).replace(/[/\\]/g, "_");
+}
+
+export interface SourceFile {
+  name: string;
+  bucket: Bucket;
+  bytes: number;
+  modifiedAt: string;
+  sha: string;
+}
+
+async function listBucket(bucket: Bucket): Promise<SourceFile[]> {
+  await ensureDirs();
+  const dir = dirFor(bucket);
+  const entries = await fs.readdir(dir);
+  const out: SourceFile[] = [];
+  for (const name of entries) {
+    if (name.startsWith(".")) continue;
+    const full = path.join(dir, name);
+    const stat = await fs.stat(full);
+    if (!stat.isFile()) continue;
+    out.push({
+      name,
+      bucket,
+      bytes: stat.size,
+      modifiedAt: stat.mtime.toISOString(),
+      sha: createHash("sha1").update(await fs.readFile(full)).digest("hex").slice(0, 12),
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function listSourceFiles(): Promise<SourceFile[]> {
+  const [sources, resumes] = await Promise.all([
+    listBucket("sources"),
+    listBucket("resumes"),
+  ]);
+  return [...sources, ...resumes];
+}
+
+export async function resolveSourceFile(
+  name: string,
+  bucket: Bucket
+): Promise<string | null> {
+  const allowed = await listBucket(bucket);
+  const target = safeName(name);
+  return allowed.some((f) => f.name === target) ? path.join(dirFor(bucket), target) : null;
+}
+
+/** Save an uploaded file, never overwriting: "notes.md" → "notes (2).md". */
+export async function saveSourceUpload(
+  filename: string,
+  data: Buffer,
+  bucket: Bucket = "sources"
+): Promise<string> {
+  await ensureDirs();
+  const base = safeName(filename) || "upload";
+  const ext = path.extname(base);
+  const stem = base.slice(0, base.length - ext.length) || "upload";
+  const dir = dirFor(bucket);
+
+  let candidate = base;
+  let n = 2;
+  while (true) {
+    try {
+      await fs.access(path.join(dir, candidate));
+      candidate = `${stem} (${n++})${ext}`;
+    } catch {
+      break;
+    }
+  }
+  await fs.writeFile(path.join(dir, candidate), data);
+  return candidate;
+}
+
+export async function deleteSourceFile(name: string, bucket: Bucket): Promise<boolean> {
+  const resolved = await resolveSourceFile(name, bucket);
+  if (!resolved) return false;
+  await fs.unlink(resolved);
+  return true;
+}
+
+// ---------- ingest ledger ----------
+
+export interface LedgerEntry {
+  sha: string;
+  absorbedAt: string;
+  entities: number;
+  facts: number;
+  items: number;
+}
+
+export type Ledger = Record<string, LedgerEntry>;
+
+export async function loadLedger(): Promise<Ledger> {
+  await ensureDirs();
+  try {
+    return JSON.parse(await fs.readFile(LEDGER_PATH, "utf-8")) as Ledger;
+  } catch {
+    return {};
+  }
+}
+
+export async function recordAbsorbed(
+  key: string,
+  entry: LedgerEntry
+): Promise<void> {
+  const ledger = await loadLedger();
+  ledger[key] = entry;
+  await fs.writeFile(LEDGER_PATH, JSON.stringify(ledger, null, 2), "utf-8");
+}
+
+/** Status of a file relative to what memory has already absorbed. */
+export type SourceStatus = "new" | "absorbed" | "changed";
+
+export function statusOf(file: SourceFile, ledger: Ledger): SourceStatus {
+  const entry = ledger[`${file.bucket}/${file.name}`];
+  if (!entry) return "new";
+  return entry.sha === file.sha ? "absorbed" : "changed";
 }
 
 // ---------- resumes (read-only) ----------
