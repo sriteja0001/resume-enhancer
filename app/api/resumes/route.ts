@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
-import { listResumes } from "@/lib/storage";
+// GET /api/resumes — filenames in data/resumes/. This listing doubles as the
+// server-side allowlist: the UI sends back a name, never a path.
 
-// Folder contents change between requests (I add/edit files in Word).
+import { listResumes } from "@/lib/memory/store";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ resumes: await listResumes() });
+  return Response.json({ resumes: await listResumes() });
 }

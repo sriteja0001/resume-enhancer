@@ -1,87 +1,122 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import ProfilePanel from "@/components/ProfilePanel";
-import RunPanel from "@/components/RunPanel";
-import OutputPanel from "@/components/OutputPanel";
-import type { Profile } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
+import EnhancePanel from "@/components/EnhancePanel";
+import IntakePanel from "@/components/IntakePanel";
+import MemoryPane, { type MemoryPayload } from "@/components/MemoryPane";
 
-// Single-page, three-panel layout (plan §7):
-// profile (everything the system knows) | run | output + chat.
+// Two modes, one memory. Intake puts information in; Enhance spends it against
+// a specific posting. The memory pane is always reachable because it is the
+// thing that makes the other two work.
+
+type Mode = "intake" | "enhance";
 
 export default function Home() {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mode, setMode] = useState<Mode>("enhance");
+  const [memory, setMemory] = useState<MemoryPayload | null>(null);
+  const [resumes, setResumes] = useState<string[]>([]);
+  const [showMemory, setShowMemory] = useState(false);
+
+  const loadMemory = useCallback(() => {
+    fetch("/api/memory")
+      .then((r) => r.json())
+      .then(setMemory)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
-    fetch("/api/profile")
+    loadMemory();
+    fetch("/api/resumes")
       .then((r) => r.json())
-      .then(setProfile)
-      .catch(() => setSaveState("error"));
-  }, []);
+      .then((d) => setResumes(d.resumes ?? []))
+      .catch(() => {});
+  }, [loadMemory]);
 
-  // Debounced autosave: every edit persists to data/profile.json ~1s after
-  // typing stops. No save button to forget.
-  const onProfileChange = useCallback((next: Profile) => {
-    setProfile(next);
-    setSaveState("dirty");
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      setSaveState("saving");
-      try {
-        const res = await fetch("/api/profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(next),
-        });
-        setSaveState(res.ok ? "saved" : "error");
-      } catch {
-        setSaveState("error");
-      }
-    }, 1000);
-  }, []);
+  const memoryEmpty = (memory?.memory.entities.length ?? 0) === 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-zinc-950">
-      <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
-        <h1 className="text-lg font-semibold">Resume Enhancer</h1>
-        <span className="text-xs text-zinc-400">
-          {saveState === "saved" && "profile saved"}
-          {saveState === "dirty" && "…"}
-          {saveState === "saving" && "saving…"}
-          {saveState === "error" && (
-            <span className="text-red-500">profile save failed</span>
-          )}
-        </span>
+    <div className="mx-auto w-full max-w-[1400px] px-6 py-10">
+      {memory?.demo && (
+        <div className="mb-6 border-2 border-dropped-ink bg-dropped p-4 text-dropped-ink">
+          <p className="text-sm font-bold uppercase tracking-wide">
+            ⚠ Demo mode — no AI is running
+          </p>
+          <p className="mt-1 text-xs leading-5">
+            No <code>ANTHROPIC_API_KEY</code> was found, so extraction and tailoring are
+            being done by hand-written keyword rules, not a model. Parsing, the memory
+            graph, diffing, the number audit and .docx export are all real — only the
+            judgment is fake. Add your key to <code>.env.local</code> and restart the dev
+            server for the actual product.
+          </p>
+        </div>
+      )}
+
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-5xl tracking-tight">Resume Enhancer</h1>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted">
+            A knowledge base of everything you&apos;ve done, spent against one job
+            posting at a time. It decides what belongs on the page, in which section,
+            in what order — and it cannot write a number you never gave it.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="flex border-2 border-foreground">
+            {(["intake", "enhance"] as const).map((m) => (
+              <button
+                key={m}
+                className={`px-4 py-1.5 font-bold ${
+                  mode === m ? "bg-foreground text-background" : "hover:bg-surface"
+                }`}
+                onClick={() => setMode(m)}
+              >
+                {m === "intake" ? "Intake" : "Enhance"}
+              </button>
+            ))}
+          </div>
+          <button
+            className="underline underline-offset-8"
+            onClick={() => setShowMemory((v) => !v)}
+          >
+            {showMemory ? "hide memory" : "memory"}
+            <span className="ml-1 text-xs text-muted">
+              ({memory?.stats.entities ?? 0}e/{memory?.stats.facts ?? 0}f)
+            </span>
+          </button>
+        </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[1.2fr_1fr_1fr]">
-        <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Profile — everything the system knows
+      <div
+        className={
+          showMemory
+            ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+            : "grid gap-6"
+        }
+      >
+        <main className="border border-line bg-surface p-5">
+          <h2 className="mb-4 text-[15px] font-bold">
+            {mode === "intake" ? "Intake — add to memory" : "Enhance — tailor to a posting"}
           </h2>
-          {profile ? (
-            <ProfilePanel profile={profile} onChange={onProfileChange} />
+          {mode === "intake" ? (
+            <IntakePanel resumes={resumes} onIngested={loadMemory} />
           ) : (
-            <p className="text-sm text-zinc-400">Loading…</p>
+            <EnhancePanel
+              resumes={resumes}
+              memoryEmpty={memoryEmpty}
+              onGoToIntake={() => setMode("intake")}
+            />
           )}
-        </section>
+        </main>
 
-        <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Run
-          </h2>
-          <RunPanel />
-        </section>
-
-        <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Output
-          </h2>
-          <OutputPanel />
-        </section>
-      </main>
+        {showMemory && (
+          <aside className="border border-line bg-surface p-5">
+            <h2 className="mb-4 text-[15px] font-bold">
+              Memory — everything the system knows about you
+            </h2>
+            <MemoryPane payload={memory} onSaved={setMemory} />
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

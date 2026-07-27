@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
+/* Single light theme: cream paper, near-black ink, thin warm-gray lines.
+   The change colours are the product's core vocabulary — black means the
+   line survived from your original file untouched, and every tint means
+   the enhancer did something you should look at. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f3ee;
+  --surface: #fdfcf9;
+  --paper: #ffffff;
+  --foreground: #161616;
+  --muted: #706e60;
+  --line: #d8d6c9;
+
+  --added: #d8f0d2;
+  --added-ink: #14532d;
+  --rewritten: #fdf0c2;
+  --rewritten-ink: #713f12;
+  --moved: #dbe7fb;
+  --moved-ink: #1e3a8a;
+  --dropped: #f3d6d6;
+  --dropped-ink: #7f1d1d;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-paper: var(--paper);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-added: var(--added);
+  --color-added-ink: var(--added-ink);
+  --color-rewritten: var(--rewritten);
+  --color-rewritten-ink: var(--rewritten-ink);
+  --color-moved: var(--moved);
+  --color-moved-ink: var(--moved-ink);
+  --color-dropped: var(--dropped);
+  --color-dropped-ink: var(--dropped-ink);
+  --font-mono: var(--font-plex-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+/* The rendered resume is a document, not app chrome — serif, tighter. */
+.paper {
+  background: var(--paper);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.45;
+}
+.paper h2 {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+mark {
+  background: transparent;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
 }

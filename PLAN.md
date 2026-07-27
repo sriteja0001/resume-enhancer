@@ -1,6 +1,6 @@
 # Resume Enhancer — Project Plan
 
-**Author:** Sriteja (with Claude Code)
+**Author:** Sriteja
 **Date:** 2026-07-24
 **Status:** v4 — grounded in ATS research (see Changelog §14, research in Appendix A)
 

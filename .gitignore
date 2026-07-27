@@ -38,6 +38,9 @@ yarn-error.log*
 /data/
 *.docx
 
+# local reference images / screenshots
+/Screenshot*.png
+
 # vercel
 .vercel
 
