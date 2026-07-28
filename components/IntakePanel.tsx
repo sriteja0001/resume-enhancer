@@ -76,7 +76,9 @@ export default function IntakePanel({ onIngested }: Props) {
       .then(setLibrary)
       .catch(() => setError("Could not read the file library"));
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const key = (f: SourceFile) => `${f.bucket}/${f.name}`;
 

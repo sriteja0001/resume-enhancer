@@ -50,8 +50,15 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
       .then((d) => setHistory(d.sessions ?? []))
       .catch(() => {});
   };
-  useEffect(loadHistory, [session?.id]);
-  useEffect(() => chatEnd.current?.scrollIntoView({ behavior: "smooth" }), [session?.chat.length]);
+  // Braces matter: an effect must return a cleanup function or nothing, and a
+  // bare `() => expr` body returns whatever the expression evaluates to.
+  useEffect(() => {
+    loadHistory();
+  }, [session?.id]);
+
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ behavior: "smooth" });
+  }, [session?.chat.length]);
 
   const run = async () => {
     setBusy("tailor");
