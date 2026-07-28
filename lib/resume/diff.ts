@@ -26,15 +26,115 @@ const normalize = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
  * same words gets corrected to "kept"; a bullet whose text matches one from a
  * different section is marked "moved" with its old home recorded.
  */
+/** Tokens that carry no identifying weight when matching an organization. */
+const STOPWORDS = new Set([
+  "the", "of", "and", "at", "in", "for", "a", "an",
+  "university", "school", "inc", "llc", "ltd", "co", "company", "channel",
+]);
+
+function tokens(s: string | null): Set<string> {
+  return new Set(
+    normalize(s ?? "")
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+  );
+}
+
+/** Jaccard overlap — symmetric, so it won't match a short name into a long one. */
+function similarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared += 1;
+  return shared / (a.size + b.size - shared);
+}
+
+interface OriginalEntry {
+  section: string;
+  orgTokens: Set<string>;
+  bulletKeys: Set<string>;
+  claimed: boolean;
+}
+
+/**
+ * How many original entries each token appears in. A token belonging to
+ * exactly one entry ("wellnest") identifies it on its own; a token shared by
+ * several ("stanford") identifies nothing.
+ */
+function tokenFrequency(originals: OriginalEntry[]): Map<string, number> {
+  const freq = new Map<string, number>();
+  for (const o of originals) {
+    for (const t of o.orgTokens) freq.set(t, (freq.get(t) ?? 0) + 1);
+  }
+  return freq;
+}
+
+/**
+ * Find which original entry a tailored entry came from. Exact string matching
+ * is not enough: tailoring legitimately rewrites the label itself ("Stanford
+ * University School of Medicine: Sonnenburg Lab" becomes "Stanford School of
+ * Medicine — Sonnenburg Lab"), and treating that as a brand-new entry would
+ * paint the whole resume as "added" and make the highlighting meaningless.
+ */
+function matchOriginal(
+  entry: ResumeDoc["sections"][number]["entries"][number],
+  originals: OriginalEntry[],
+  freq: Map<string, number>
+): OriginalEntry | null {
+  // Strongest signal: a bullet that names the wording it replaced. Independent
+  // of how the organization got relabelled.
+  const provenance = new Set(
+    entry.bullets
+      .map((b) => (b.originalText ? normalize(b.originalText) : null))
+      .filter((v): v is string => v !== null)
+  );
+  if (provenance.size > 0) {
+    for (const candidate of originals) {
+      if (candidate.claimed) continue;
+      for (const key of provenance) {
+        if (candidate.bulletKeys.has(key)) return candidate;
+      }
+    }
+  }
+
+  // Otherwise fall back to fuzzy organization identity, best match wins.
+  const orgTokens = tokens(entry.org);
+  let best: OriginalEntry | null = null;
+  let bestScore = 0;
+  for (const candidate of originals) {
+    if (candidate.claimed) continue;
+    const score = similarity(orgTokens, candidate.orgTokens);
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  if (bestScore >= 0.5) return best;
+
+  // Last resort: a token unique to one original entry. This catches a project
+  // whose original "organization" was the entire line ("Wellnest • AI health
+  // platform • Python, LangGraph, …") and is now just its name, where token
+  // overlap is low but "wellnest" still points at exactly one entry.
+  const unique = originals.filter(
+    (candidate) =>
+      !candidate.claimed &&
+      [...orgTokens].some((t) => candidate.orgTokens.has(t) && freq.get(t) === 1)
+  );
+  return unique.length === 1 ? unique[0] : null;
+}
+
 export function reconcileOrigins(tailored: ResumeDoc, original: ResumeDoc): ResumeDoc {
   const originalBullets = new Map<string, string>(); // normalized text → section
-  const originalEntries = new Map<string, string>(); // normalized org/role → section
   const originalInline = new Set<string>();
+  const originals: OriginalEntry[] = [];
 
   for (const s of original.sections) {
     for (const e of s.entries) {
-      const key = normalize([e.org, e.role].filter(Boolean).join(" "));
-      if (key) originalEntries.set(key, s.title);
+      originals.push({
+        section: s.title,
+        orgTokens: tokens(e.org),
+        bulletKeys: new Set(e.bullets.map((b) => normalize(b.text))),
+        claimed: false,
+      });
       for (const b of e.bullets) originalBullets.set(normalize(b.text), s.title);
       for (const list of e.inlineLists) {
         for (const v of list.values) {
@@ -44,11 +144,16 @@ export function reconcileOrigins(tailored: ResumeDoc, original: ResumeDoc): Resu
     }
   }
 
+  const freq = tokenFrequency(originals);
+
   for (const s of tailored.sections) {
     for (const e of s.entries) {
-      const entryKey = normalize([e.org, e.role].filter(Boolean).join(" "));
-      const previousSection = originalEntries.get(entryKey);
-      if (!entryKey) {
+      const hasIdentity = Boolean(normalize([e.org, e.role].filter(Boolean).join(" ")));
+      const match = hasIdentity ? matchOriginal(e, originals, freq) : null;
+      if (match) match.claimed = true;
+      const previousSection = match?.section;
+
+      if (!hasIdentity) {
         // Nothing identifying to compare on (e.g. a bare skills block) — we
         // can't prove it's new, so don't accuse it of being new.
         e.origin = "kept";

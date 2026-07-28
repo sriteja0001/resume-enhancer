@@ -106,6 +106,46 @@ test("moving an entry between sections is detected and attributed", () => {
   assert.equal(moved.movedFrom, "LEADERSHIP");
 });
 
+test("an entry is still recognized when tailoring relabels its organization", () => {
+  // Observed on a real run: the model rewrites the label itself, e.g.
+  // "Northwind Lab" -> "Northwind Institute — ML Group". Exact string matching
+  // called these brand new, which painted the whole resume as "added" and made
+  // the highlighting meaningless.
+  const original = blocksToDoc(BLOCKS);
+  const tailored: ResumeDoc = JSON.parse(JSON.stringify(original));
+
+  const lab = tailored.sections[1].entries[0];
+  lab.org = "Northwind Institute — ML Group";
+  const youtube = tailored.sections[2].entries[0];
+  youtube.org = "TEJA (supplements)";
+
+  const out = reconcileOrigins(tailored, original);
+  assert.equal(out.sections[1].entries[0].origin, "kept", "relabelled org is not 'added'");
+  assert.equal(out.sections[2].entries[0].origin, "kept");
+});
+
+test("a genuinely new entry is still reported as added", () => {
+  const original = blocksToDoc(BLOCKS);
+  const tailored: ResumeDoc = JSON.parse(JSON.stringify(original));
+  tailored.sections[1].entries.push({
+    id: "new1",
+    entityId: null,
+    org: "Helix Robotics",
+    role: "Founding Engineer",
+    location: null,
+    dates: "2026",
+    bullets: [],
+    inlineLists: [],
+    origin: "kept",
+    movedFrom: null,
+    why: null,
+  });
+
+  const out = reconcileOrigins(tailored, original);
+  const added = out.sections[1].entries.find((e) => e.org === "Helix Robotics")!;
+  assert.equal(added.origin, "added", "an entry with no counterpart is genuinely new");
+});
+
 test("dropped coursework is recorded rather than silently vanishing", () => {
   const original = blocksToDoc(BLOCKS);
   const tailored: ResumeDoc = JSON.parse(JSON.stringify(original));
