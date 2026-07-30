@@ -67,13 +67,21 @@ export async function docToDocx(
   const rightMargin = usableWidth(t);
   const children: Paragraph[] = [];
 
+  // Name, then the contact/links line directly beneath it, then a rule across
+  // the page — the standard resume header, and what makes the exported file
+  // usable as-is rather than something you still have to top off in Word.
   if (doc.header.name) {
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 20 },
+        spacing: { after: 40 },
         children: [
-          new TextRun({ text: doc.header.name, bold: true, size: t.nameSize, color: INK }),
+          new TextRun({
+            text: doc.header.name,
+            bold: true,
+            size: t.nameSize,
+            color: INK,
+          }),
         ],
       })
     );
@@ -82,9 +90,18 @@ export async function docToDocx(
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 100 },
+        spacing: { after: 60 },
+        border: {
+          bottom: { color: INK, style: BorderStyle.SINGLE, size: 4, space: 6 },
+        },
         children: [
-          new TextRun({ text: doc.header.contactLine, size: t.contactSize, color: INK }),
+          new TextRun({
+            // Separators normalised so a line pulled from a Word header, from
+            // memory, or from the model all read the same on the page.
+            text: doc.header.contactLine.replace(/\s*[•|]\s*/g, "  •  "),
+            size: t.contactSize,
+            color: INK,
+          }),
         ],
       })
     );

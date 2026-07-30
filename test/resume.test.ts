@@ -13,7 +13,7 @@ import { docToDocx } from "../lib/resume/docx-export";
 import type { ResumeDoc } from "../lib/resume/model";
 import { changeLog, countChanges, docToText } from "../lib/resume/model";
 import { blocksToDoc, type Block } from "../lib/resume/parse";
-import { PRESETS, estimateHeight, fitToOnePage, usableHeight } from "../lib/resume/layout";
+import { estimateHeight, fitToOnePage, usableHeight } from "../lib/resume/layout";
 
 const p = (text: string, o: { bold?: boolean; italic?: boolean } = {}): Block => ({
   kind: "paragraph",
@@ -289,7 +289,11 @@ test("export auto-fits to one page instead of spilling over", () => {
     entry.bullets.push({ ...entry.bullets[0], id: `pad${i}` });
   }
   const fatFit = fitToOnePage(fat);
-  assert.notEqual(fatFit.typography.name, PRESETS[0].name, "steps down from the roomiest preset");
+  assert.notEqual(
+    fatFit.typography.name,
+    "comfortable",
+    "steps down from the roomiest type scale"
+  );
 
   // And past a point, no amount of shrinking is honest — say so.
   const huge: ResumeDoc = JSON.parse(JSON.stringify(fat));

@@ -127,10 +127,18 @@ export default function ResumeMockup({ doc }: Props) {
           look desperate.
         </p>
       ) : (
-        <p className="text-[11px] text-muted">
+        <p className="text-[11px] leading-5 text-muted">
           Fits one page at <span className="font-bold">{fit.typography.name}</span>{" "}
-          spacing ({Math.round(fit.pages * 100)}% of the page used). The export
-          picks the loosest spacing that still fits.
+          spacing, {fit.typography.bodySize / 2}pt.{" "}
+          {fit.typography.name === "compact" ? (
+            <>
+              That is the tightest setting there is — the page is full. To get
+              roomier spacing you have to remove content, not change settings:
+              ask the chat to cut the least relevant bullet.
+            </>
+          ) : (
+            <>The export uses the loosest spacing that still fits.</>
+          )}
         </p>
       )}
 
