@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import JSZip from "jszip";
 import { auditDoc } from "../lib/ai/validate";
 import { parseMemory } from "../lib/memory/markdown";
 import { collectDropped, reconcileOrigins, wordDiff } from "../lib/resume/diff";
@@ -226,4 +227,44 @@ test("docx export produces a real Word file", async () => {
   // .docx is a zip: first bytes are the PK local file header.
   assert.equal(buffer[0], 0x50);
   assert.equal(buffer[1], 0x4b);
+});
+
+test("exported docx does not inherit Word's default styling", async () => {
+  // Each assertion here is a bug that shipped: headings rendered blue because
+  // Word's built-in Heading 2 style won over the inline run; a separate empty
+  // paragraph used as a horizontal rule left a gap under every heading; and
+  // Word's default list indent pushed bullet text half an inch right.
+  const zip = await JSZip.loadAsync(await docToDocx(blocksToDoc(BLOCKS)));
+  const styles = await zip.file("word/styles.xml")!.async("string");
+  const document = await zip.file("word/document.xml")!.async("string");
+  const numbering = await zip.file("word/numbering.xml")!.async("string");
+
+  const heading2 = /<w:style [^>]*w:styleId="Heading2".*?<\/w:style>/s.exec(styles)?.[0] ?? "";
+  assert.ok(heading2, "Heading2 is redefined rather than inherited");
+  assert.match(heading2, /<w:color w:val="000000"\/>/, "headings are black, not Word's blue");
+
+  const paragraphs = document.match(/<w:p>.*?<\/w:p>/gs) ?? [];
+  const textOf = (p: string) =>
+    (p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) ?? []).join("").replace(/<[^>]+>/g, "").trim();
+  assert.equal(
+    paragraphs.filter((p) => !textOf(p)).length,
+    0,
+    "no empty spacer paragraphs — they render as blank lines"
+  );
+  const bordered = paragraphs.filter((p) => p.includes("w:pBdr"));
+  assert.ok(bordered.length > 0, "section headings carry an underline");
+  for (const p of bordered) {
+    assert.ok(textOf(p), "the border sits on the heading itself, not a blank line");
+  }
+
+  assert.match(
+    numbering,
+    /<w:ind w:left="227" w:hanging="227"\/>/,
+    "bullets use a tight hanging indent"
+  );
+  assert.match(
+    document,
+    /w:pos="10800"/,
+    "right-hand column reaches the true right margin for 0.5in margins"
+  );
 });
