@@ -35,6 +35,10 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
   const [chatDraft, setChatDraft] = useState("");
   const [tab, setTab] = useState<"coverage" | "changes">("coverage");
   const chatEnd = useRef<HTMLDivElement>(null);
+  // Shown immediately so the message doesn't vanish into a silent minute
+  // while the model rebuilds the document.
+  const [pendingChat, setPendingChat] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
 
   // Default to the first resume once the list arrives, without re-running on
   // every `resume` change (which would fight the user's own selection).
@@ -58,11 +62,26 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
 
   useEffect(() => {
     chatEnd.current?.scrollIntoView({ behavior: "smooth" });
-  }, [session?.chat.length]);
+  }, [session?.chat.length, pendingChat]);
+
+  // A visible second counter is the difference between "thinking" and "broken"
+  // on a request that can legitimately run for two minutes.
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [busy]);
+
+  /** Reset the counter at the call site, so the effect never sets state synchronously. */
+  const beginWork = (kind: string) => {
+    setElapsed(0);
+    setBusy(kind);
+    setError(null);
+  };
 
   const run = async () => {
-    setBusy("tailor");
-    setError(null);
+    beginWork("tailor");
     try {
       const res = await fetch("/api/tailor", {
         method: "POST",
@@ -83,8 +102,8 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
     if (!session || !chatDraft.trim()) return;
     const message = chatDraft.trim();
     setChatDraft("");
-    setBusy("chat");
-    setError(null);
+    setPendingChat(message); // echo it straight away
+    beginWork("chat");
     try {
       const res = await fetch(`/api/sessions/${session.id}/chat`, {
         method: "POST",
@@ -94,8 +113,12 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Edit failed");
       setSession(data as Session);
+      setPendingChat(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Edit failed");
+      // Give the message back rather than swallowing what they typed.
+      setChatDraft(message);
+      setPendingChat(null);
     } finally {
       setBusy(null);
     }
@@ -103,8 +126,7 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
 
   const save = async () => {
     if (!session) return;
-    setBusy("export");
-    setError(null);
+    beginWork("export");
     try {
       const res = await fetch(`/api/sessions/${session.id}/export`, { method: "POST" });
       if (!res.ok) throw new Error((await res.json()).error ?? "Export failed");
@@ -216,7 +238,7 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
             disabled={!resume || !jd.trim() || busy !== null}
             onClick={run}
           >
-            {busy === "tailor" ? "tailoring…" : "Tailor"}
+            {busy === "tailor" ? `tailoring… ${elapsed}s` : "Tailor"}
           </button>
         </div>
       </div>
@@ -247,7 +269,9 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
                   {busy === "export" ? "saving…" : "Save .docx"}
                 </button>
               </div>
-              <ResumeMockup doc={session.tailored} />
+              <div className={busy === "chat" ? "pointer-events-none opacity-40 transition-opacity" : "transition-opacity"}>
+                <ResumeMockup doc={session.tailored} />
+              </div>
               <p className="text-[11px] leading-4 text-muted">
                 Saving writes a new file to data/exports/ and downloads it. Your original{" "}
                 {session.resumeFile} is opened read-only and never modified.
@@ -285,6 +309,28 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
                       <p className="whitespace-pre-wrap leading-5">{m.content}</p>
                     </div>
                   ))}
+
+                  {pendingChat && (
+                    <div className="border-l-2 border-foreground pl-2 opacity-60">
+                      <div className="text-[10px] font-bold uppercase">you</div>
+                      <p className="whitespace-pre-wrap leading-5">{pendingChat}</p>
+                    </div>
+                  )}
+
+                  {busy === "chat" && (
+                    <div className="border-l-2 border-rewritten-ink bg-rewritten pl-2 pr-2 py-1.5 text-rewritten-ink">
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase">
+                        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-rewritten-ink" />
+                        rewriting the document · {elapsed}s
+                      </div>
+                      <p className="mt-0.5 leading-5">
+                        The whole resume is being rebuilt against your request, then
+                        re-checked for invented numbers. This usually takes 30–90
+                        seconds.
+                      </p>
+                    </div>
+                  )}
+
                   <div ref={chatEnd} />
                 </div>
               </div>
@@ -297,7 +343,8 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
               >
                 <input
                   className="flex-1 border border-line bg-white px-2 py-1.5 font-mono text-xs focus:border-foreground focus:outline-none"
-                  placeholder="ask for a change…"
+                  placeholder={busy === "chat" ? "rewriting — hang on…" : "ask for a change…"}
+                  disabled={busy === "chat"}
                   value={chatDraft}
                   onChange={(e) => setChatDraft(e.target.value)}
                 />
