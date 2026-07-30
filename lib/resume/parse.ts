@@ -7,6 +7,8 @@
 // heading or organization, italic = role and dates) and the tabs that push a
 // second column to the right margin.
 
+import { promises as fs } from "fs";
+import JSZip from "jszip";
 import mammoth from "mammoth";
 import type { Entry, InlineList, ResumeDoc, Section } from "./model";
 
@@ -287,11 +289,65 @@ export function blocksToDoc(blocks: Block[]): ResumeDoc {
   return doc;
 }
 
+/**
+ * Read the name and contact line out of Word's header region.
+ *
+ * Many resume templates put them there rather than in the body, and mammoth
+ * only converts word/document.xml — so the parsed document came back with no
+ * name at all, and the export produced a resume with nobody's name on it.
+ */
+export async function extractDocxHeader(filePath: string): Promise<{
+  name: string | null;
+  contactLine: string | null;
+}> {
+  try {
+    const zip = await JSZip.loadAsync(await fs.readFile(filePath));
+    const paragraphs: string[] = [];
+
+    for (const path of Object.keys(zip.files)) {
+      if (!/^word\/header\d*\.xml$/.test(path)) continue;
+      const xml = await zip.file(path)!.async("string");
+      for (const match of xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)) {
+        const text = [...match[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
+          .map((m) => m[1])
+          .join("")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (text) paragraphs.push(text);
+      }
+    }
+    if (paragraphs.length === 0) return { name: null, contactLine: null };
+
+    const isContact = (s: string) => CONTACT_RE.test(s);
+    const name = paragraphs.find((p) => !isContact(p) && p.length < 60) ?? null;
+    const contact = paragraphs.filter((p) => p !== name && isContact(p)).join(" · ");
+    return { name, contactLine: contact || null };
+  } catch {
+    return { name: null, contactLine: null };
+  }
+}
+
 export async function parseResume(filePath: string): Promise<{
   doc: ResumeDoc;
   blocks: Block[];
   plainText: string;
 }> {
   const { blocks, plainText } = await extractBlocks(filePath);
-  return { doc: blocksToDoc(blocks), blocks, plainText };
+  const doc = blocksToDoc(blocks);
+
+  // Body header wins when present; otherwise fall back to Word's header region.
+  if (!doc.header.name || !doc.header.contactLine) {
+    const fromHeader = await extractDocxHeader(filePath);
+    doc.header.name ??= fromHeader.name;
+    doc.header.contactLine ??= fromHeader.contactLine;
+  }
+
+  const headerText = [doc.header.name, doc.header.contactLine].filter(Boolean).join("\n");
+  return {
+    doc,
+    blocks,
+    // Keep the header in the text handed to intake, so the knowledge base
+    // learns the person's own name and links.
+    plainText: headerText ? `${headerText}\n${plainText}` : plainText,
+  };
 }

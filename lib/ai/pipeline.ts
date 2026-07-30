@@ -19,6 +19,7 @@ import type { Entity } from "../memory/types";
 import { collectDropped, reconcileOrigins } from "../resume/diff";
 import type { ResumeDoc } from "../resume/model";
 import { docToText } from "../resume/model";
+import { lineBudget } from "../resume/layout";
 import { parseResume, renderBlocks } from "../resume/parse";
 import {
   SUPPORTED_EXTENSIONS,
@@ -325,12 +326,15 @@ export async function tailor(args: {
       maxTokens: 16000,
     });
 
+    const budget = lineBudget();
     const userMsg = tailorUser({
       target: JSON.stringify(target, null, 2),
       memory,
       currentResume: original,
       charLimit: args.charLimit,
       notes: args.notes,
+      totalLines: budget.totalLines,
+      charsPerBulletLine: budget.charsPerBulletLine,
     });
 
     let raw = await structuredCall<TailorRaw>({

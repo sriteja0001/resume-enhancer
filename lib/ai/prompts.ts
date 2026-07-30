@@ -176,6 +176,8 @@ export function tailorUser(args: {
   currentResume: ResumeDoc;
   charLimit: number;
   notes: string | null;
+  totalLines: number;
+  charsPerBulletLine: number;
 }): string {
   return `<target_profile>
 ${args.target}
@@ -190,9 +192,18 @@ ${renderDoc(args.currentResume)}
 </current_resume>
 
 Character budget per bullet: ${args.charLimit}
+
+# Space budget — this is a hard constraint, not a preference
+The page holds about ${args.totalLines} lines of text. Costs, in lines:
+- a section heading: 3 (heading plus its spacing)
+- an entry's organization + role lines: 2
+- a bullet: 1 per ${args.charsPerBulletLine} characters, so a ${args.charLimit}-character bullet costs ${Math.max(1, Math.ceil(args.charLimit / args.charsPerBulletLine))}
+- an inline list line: 1 per ${args.charsPerBulletLine} characters
+
+Add it up before you finish. A resume that runs onto a second page has failed, so if you are over, cut the least relevant bullet or entry rather than letting it spill — and say so in that entry's why. Prefer cutting whole low-value items over shortening everything into mush.
 ${args.notes ? `\nExtra instructions from the candidate: ${args.notes}` : ""}
 
-Produce the tailored resume. Keep it to the same overall size as the current resume — this must still fit one page. Every section, entry, bullet, and inline value needs its origin set and, when changed, a reason.`;
+Produce the tailored resume. Every section, entry, bullet, and inline value needs its origin set and, when changed, a reason.`;
 }
 
 /** Sent when the code audit rejects content — a corrective turn, not a retry. */

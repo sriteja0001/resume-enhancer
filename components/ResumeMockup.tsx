@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { wordDiff } from "@/lib/resume/diff";
+import { fitToOnePage } from "@/lib/resume/layout";
 import type { Bullet, InlineValue, Origin, ResumeDoc } from "@/lib/resume/model";
 
 // The rendering of the tailored resume. The rule the whole product hangs on:
@@ -100,6 +101,8 @@ interface Props {
 
 export default function ResumeMockup({ doc }: Props) {
   const [showDiff, setShowDiff] = useState(true);
+  // Surfaced here so overflow is visible before export, not after opening Word.
+  const fit = fitToOnePage(doc);
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,6 +117,22 @@ export default function ResumeMockup({ doc }: Props) {
           show word-level changes
         </label>
       </div>
+
+      {fit.needsCuts ? (
+        <p className="border-2 border-dropped-ink bg-dropped p-2 text-[11px] leading-5 text-dropped-ink">
+          <span className="font-bold">Runs onto a second page.</span> Even at the
+          tightest readable spacing this is about {fit.overflowLines} line
+          {fit.overflowLines === 1 ? "" : "s"} too long. Ask the chat to cut the
+          least relevant bullet or entry — shrinking the type further would make it
+          look desperate.
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted">
+          Fits one page at <span className="font-bold">{fit.typography.name}</span>{" "}
+          spacing ({Math.round(fit.pages * 100)}% of the page used). The export
+          picks the loosest spacing that still fits.
+        </p>
+      )}
 
       <article className="paper border border-line p-8 text-[13px] shadow-[3px_3px_0_0_var(--line)]">
         {doc.header.name && (

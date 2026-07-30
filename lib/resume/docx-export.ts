@@ -23,27 +23,17 @@ import {
   TextRun,
 } from "docx";
 import type { ResumeDoc } from "./model";
+import type { Typography } from "./layout";
+import { fitToOnePage, usableWidth } from "./layout";
 
 const INK = "000000";
-const PAGE_MARGIN = 720; // 0.5"
-// US Letter is 12240 twips wide; the usable column is the page minus both
-// margins. TabStopPosition.MAX assumes 1" margins and would stop short of the
-// edge here, leaving locations and dates floating mid-line instead of flush
-// right.
-const RIGHT_MARGIN = 12240 - PAGE_MARGIN * 2;
-
-// Sizes are half-points: 20 = 10pt. Spacing is twips: 20 = 1pt.
-const BODY_SIZE = 20;
-const NAME_SIZE = 30;
-const CONTACT_SIZE = 18;
-const HEADING_SIZE = 22;
-
 const BULLET_REF = "resume-bullets";
 
 /** "Left text ............ Right text" via a right-aligned tab stop. */
 function twoColumn(
   left: string,
   right: string | null,
+  rightMargin: number,
   opts: { bold?: boolean; italics?: boolean } = {}
 ): Paragraph {
   const runs = [
@@ -61,12 +51,20 @@ function twoColumn(
   }
   return new Paragraph({
     children: runs,
-    tabStops: [{ type: TabStopType.RIGHT, position: RIGHT_MARGIN }],
+    tabStops: [{ type: TabStopType.RIGHT, position: rightMargin }],
     spacing: { after: 0 },
   });
 }
 
-export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
+export async function docToDocx(
+  doc: ResumeDoc,
+  typographyOverride?: Typography
+): Promise<Buffer> {
+  // Pick the loosest typography that still fits one page. A resume that spills
+  // onto page two has failed, and shrinking the type is what a person would do
+  // in Word before cutting anything real.
+  const t = typographyOverride ?? fitToOnePage(doc).typography;
+  const rightMargin = usableWidth(t);
   const children: Paragraph[] = [];
 
   if (doc.header.name) {
@@ -75,7 +73,7 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
         alignment: AlignmentType.CENTER,
         spacing: { after: 20 },
         children: [
-          new TextRun({ text: doc.header.name, bold: true, size: NAME_SIZE, color: INK }),
+          new TextRun({ text: doc.header.name, bold: true, size: t.nameSize, color: INK }),
         ],
       })
     );
@@ -86,7 +84,7 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
         alignment: AlignmentType.CENTER,
         spacing: { after: 100 },
         children: [
-          new TextRun({ text: doc.header.contactLine, size: CONTACT_SIZE, color: INK }),
+          new TextRun({ text: doc.header.contactLine, size: t.contactSize, color: INK }),
         ],
       })
     );
@@ -97,7 +95,7 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
-        spacing: { before: 200, after: 60 },
+        spacing: { before: t.headingBefore, after: t.headingAfter },
         border: {
           bottom: { color: INK, style: BorderStyle.SINGLE, size: 6, space: 2 },
         },
@@ -105,7 +103,7 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
           new TextRun({
             text: section.title.toUpperCase(),
             bold: true,
-            size: HEADING_SIZE,
+            size: t.headingSize,
             color: INK,
           }),
         ],
@@ -122,13 +120,13 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
                 ? [new TextRun({ text: `\t${entry.location}`, color: INK })]
                 : []),
             ],
-            tabStops: [{ type: TabStopType.RIGHT, position: RIGHT_MARGIN }],
-            spacing: { before: index === 0 ? 0 : 120, after: 0 },
+            tabStops: [{ type: TabStopType.RIGHT, position: rightMargin }],
+            spacing: { before: index === 0 ? 0 : t.entryBefore, after: 0 },
           })
         );
       }
       if (entry.role || entry.dates) {
-        children.push(twoColumn(entry.role ?? "", entry.dates, { italics: true }));
+        children.push(twoColumn(entry.role ?? "", entry.dates, rightMargin, { italics: true }));
       }
 
       for (const list of entry.inlineLists) {
@@ -150,7 +148,7 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
         children.push(
           new Paragraph({
             numbering: { reference: BULLET_REF, level: 0 },
-            spacing: { after: 20, line: 240 },
+            spacing: { after: t.bulletAfter, line: t.line },
             children: [new TextRun({ text: bullet.text, color: INK })],
           })
         );
@@ -162,15 +160,15 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
     styles: {
       default: {
         document: {
-          run: { font: "Calibri", size: BODY_SIZE, color: INK },
-          paragraph: { spacing: { line: 240, after: 0 } },
+          run: { font: "Calibri", size: t.bodySize, color: INK },
+          paragraph: { spacing: { line: t.line, after: 0 } },
         },
         // Redefined so Word's blue Heading 2 never appears. Keeping the
         // heading level (rather than styling a plain paragraph) preserves the
         // document outline, which some resume parsers use for sectioning.
         heading2: {
-          run: { font: "Calibri", size: HEADING_SIZE, bold: true, color: INK },
-          paragraph: { spacing: { before: 200, after: 60 } },
+          run: { font: "Calibri", size: t.headingSize, bold: true, color: INK },
+          paragraph: { spacing: { before: t.headingBefore, after: t.headingAfter } },
         },
       },
     },
@@ -199,10 +197,10 @@ export async function docToDocx(doc: ResumeDoc): Promise<Buffer> {
         properties: {
           page: {
             margin: {
-              top: PAGE_MARGIN,
-              bottom: PAGE_MARGIN,
-              left: PAGE_MARGIN,
-              right: PAGE_MARGIN,
+              top: t.margin,
+              bottom: t.margin,
+              left: t.margin,
+              right: t.margin,
             },
           },
         },

@@ -13,6 +13,7 @@ import { docToDocx } from "../lib/resume/docx-export";
 import type { ResumeDoc } from "../lib/resume/model";
 import { changeLog, countChanges, docToText } from "../lib/resume/model";
 import { blocksToDoc, type Block } from "../lib/resume/parse";
+import { PRESETS, estimateHeight, fitToOnePage, usableHeight } from "../lib/resume/layout";
 
 const p = (text: string, o: { bold?: boolean; italic?: boolean } = {}): Block => ({
   kind: "paragraph",
@@ -267,4 +268,33 @@ test("exported docx does not inherit Word's default styling", async () => {
     /w:pos="10800"/,
     "right-hand column reaches the true right margin for 0.5in margins"
   );
+});
+
+test("export auto-fits to one page instead of spilling over", () => {
+  // A resume that runs onto a second page has failed. The exporter picks the
+  // loosest spacing that still fits rather than always using the roomiest.
+  const doc = blocksToDoc(BLOCKS);
+  const fit = fitToOnePage(doc);
+  assert.ok(!fit.needsCuts, "a short resume fits without cutting content");
+  assert.ok(
+    estimateHeight(doc, fit.typography) <= usableHeight(fit.typography),
+    "chosen typography actually fits the page"
+  );
+
+  // Enough content to overflow the roomiest setting must select a tighter one.
+  const fat: ResumeDoc = JSON.parse(JSON.stringify(doc));
+  const entry = fat.sections[1].entries[0];
+  // Roughly one line each; the roomiest preset holds about 60 lines total.
+  for (let i = 0; i < 55; i++) {
+    entry.bullets.push({ ...entry.bullets[0], id: `pad${i}` });
+  }
+  const fatFit = fitToOnePage(fat);
+  assert.notEqual(fatFit.typography.name, PRESETS[0].name, "steps down from the roomiest preset");
+
+  // And past a point, no amount of shrinking is honest — say so.
+  const huge: ResumeDoc = JSON.parse(JSON.stringify(fat));
+  for (let i = 0; i < 200; i++) {
+    huge.sections[1].entries[0].bullets.push({ ...entry.bullets[0], id: `x${i}` });
+  }
+  assert.ok(fitToOnePage(huge).needsCuts, "reports when content itself must be cut");
 });
