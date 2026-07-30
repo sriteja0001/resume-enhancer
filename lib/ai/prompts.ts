@@ -16,6 +16,21 @@ import type { ResumeDoc } from "../resume/model";
 export function renderMemory(memory: Memory): string {
   if (memory.entities.length === 0) return "(memory is empty)";
   const lines: string[] = [];
+
+  // Identity first: without it the model has no name or contact line to put at
+  // the top of a resume whose own header was missing.
+  const id = memory.identity;
+  const identityParts = [
+    id.name && `name: ${id.name}`,
+    id.email && `email: ${id.email}`,
+    id.phone && `phone: ${id.phone}`,
+    id.location && `location: ${id.location}`,
+    id.links.length > 0 && `links: ${id.links.join(", ")}`,
+  ].filter(Boolean);
+  if (identityParts.length > 0) {
+    lines.push("## Identity", ...(identityParts as string[]), "");
+  }
+
   for (const e of memory.entities) {
     lines.push(
       `### [${e.id}] ${e.title}`,

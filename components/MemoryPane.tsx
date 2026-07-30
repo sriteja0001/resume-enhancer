@@ -80,6 +80,29 @@ export default function MemoryPane({ payload, onSaved }: Props) {
         ))}
       </div>
 
+      {(memory.identity.name ||
+        memory.identity.email ||
+        memory.identity.links.length > 0) && (
+        <div className="border border-line bg-background p-3 text-xs">
+          <p className="mb-1 text-muted">
+            identity — used as the resume header when a file doesn&apos;t carry one
+          </p>
+          {memory.identity.name && (
+            <p className="text-sm font-bold">{memory.identity.name}</p>
+          )}
+          <p className="leading-5 text-muted">
+            {[
+              memory.identity.email,
+              memory.identity.phone,
+              memory.identity.location,
+              ...memory.identity.links,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+      )}
+
       {stats.domains.length > 0 && (
         <div className="text-xs">
           <p className="mb-1 text-muted">

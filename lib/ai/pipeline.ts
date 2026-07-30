@@ -366,6 +366,15 @@ export async function tailor(args: {
     strategy = raw.strategy;
   }
 
+  // A resume with nobody's name on it is unusable. If neither the model nor the
+  // source file supplied a header, fall back to what memory learned.
+  const contactFromMemory =
+    [memory.identity.email, memory.identity.phone, ...memory.identity.links]
+      .filter(Boolean)
+      .join(" · ") || null;
+  doc.header.name ??= original.header.name ?? memory.identity.name;
+  doc.header.contactLine ??= original.header.contactLine ?? contactFromMemory;
+
   // Origins are decided by comparison, not by assertion.
   doc = collectDropped(reconcileOrigins(doc, original), original);
 
