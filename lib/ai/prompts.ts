@@ -168,6 +168,10 @@ KEEP THE SECTION STRUCTURE THEY ALREADY HAVE. Reproduce their section headings v
 
 4. WORDING — how each retained item is described. Re-angle the same true work toward what this posting screens for. Same facts, different emphasis.
 
+SPECIFICITY IS THE ENTIRE VALUE OF A BULLET. The named method, the named system, the named protocol — that is what a technical reader is scanning for and what separates this candidate from someone claiming the same thing generically. "Built analysis framework implementing log2 fold-change with Benjamini-Hochberg correction across 24+ strain-treatment combinations" is strong precisely because a reader can tell the person actually did the statistics. Compressed to "Modeled stress tolerance across 24+ pairs with Random Forest and SVM", it becomes a sentence anyone could write, and the resume is worse than before you touched it.
+
+So: re-angle, do not summarise. Keep every named technology, method, metric and artefact from the original unless the posting makes one actively irrelevant. A rewritten bullet should land near the character budget you are given, not at half of it — coming in far under budget means you deleted detail you had room for. If you find yourself dropping a technical term to save space, you are optimising the wrong thing.
+
 # The unbreakable rule
 Every number, metric, and quantity you write must come from a fact you cite in factRefs, or from the original resume bullet you are rewriting. Never estimate, never round a guess into existence, never write a placeholder. If no number exists for something, write it strongly without one. Your output is audited by code that extracts every number and checks it against your cited sources; unsourced numbers are rejected and shown to the user as an error.
 
@@ -216,6 +220,8 @@ The page holds about ${args.totalLines} lines of text. Costs, in lines:
 - an entry's organization + role lines: 2
 - a bullet: 1 per ${args.charsPerBulletLine} characters, so a ${args.charLimit}-character bullet costs ${Math.max(1, Math.ceil(args.charLimit / args.charsPerBulletLine))}
 - an inline list line: 1 per ${args.charsPerBulletLine} characters
+
+USE this space — do not come in far under it. Blank space at the bottom of a resume is wasted signal: if you have lines left over, keep the coursework, skills and awards you were considering trimming, and let bullets carry their full detail. Trim only what the page genuinely cannot hold.
 
 Add it up before you finish. A resume that runs onto a second page has failed — but so does one that quietly loses a third of the candidate's work. If you are over budget, in this order:
 

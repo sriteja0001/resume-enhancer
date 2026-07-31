@@ -230,7 +230,12 @@ export function fitToOnePage(doc: ResumeDoc): Fit {
  * is the unit the model can reason about while writing.
  */
 export function lineBudget(): { totalLines: number; charsPerBulletLine: number } {
-  const t = DEFAULT_TYPOGRAPHY;
+  // Budget against the TIGHTEST setting the exporter can fall back to, not the
+  // roomiest. Quoting the loose figure told the model it had 48 lines when 69
+  // were available, so it compressed every bullet to about half its length and
+  // dropped coursework it had room for — detail is the signal on a resume, and
+  // understating the page is what destroys it.
+  const t = spacingAt(TYPE_SCALES[TYPE_SCALES.length - 1], 0);
   return {
     totalLines: Math.floor(
       (usableHeight(t) * FILL_TARGET) / lineHeight(t.bodySize, t.line)
