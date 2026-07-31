@@ -61,7 +61,7 @@ function BulletLine({ bullet, showDiff }: { bullet: Bullet; showDiff: boolean })
 
   return (
     <li
-      className={`ml-4 list-disc pl-1 ${failed ? "outline outline-2 outline-dropped-ink" : ""}`}
+      className={`ml-4 list-disc pl-1 leading-snug ${failed ? "outline outline-2 outline-dropped-ink" : ""}`}
       title={bullet.why ?? undefined}
     >
       <mark className={tint}>{body}</mark>
@@ -151,34 +151,39 @@ export default function ResumeMockup({ doc }: Props) {
         )}
 
         {doc.sections.map((section) => (
-          <section key={section.id} className="mb-4">
+          <section key={section.id} className="mb-3">
             <h2
-              className="mb-1 border-b border-foreground pb-0.5 text-[11px] font-bold uppercase tracking-widest"
+              className="mb-1.5 border-b border-foreground pb-0.5 text-[11px] font-bold uppercase tracking-widest"
               title={section.why ?? undefined}
             >
               {section.title}
             </h2>
 
             {section.entries.map((entry) => (
-              <div key={entry.id} className="mb-2.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-bold">
-                    <mark className={entry.origin === "kept" ? "" : TINT[entry.origin]}>
-                      {entry.org ?? ""}
-                    </mark>
-                    {entry.origin === "moved" && entry.movedFrom && (
-                      <span
-                        className="ml-2 rounded-sm bg-moved px-1 py-px align-middle text-[9px] font-normal uppercase tracking-wide text-moved-ink"
-                        title={entry.why ?? undefined}
-                      >
-                        moved from {entry.movedFrom}
-                      </span>
+              <div key={entry.id} className="mb-2">
+                {/* Only emit a row when it has something in it. An entry with no
+                    organization still rendered its header, and an empty flex row
+                    occupies a full line — which is where the stray gaps came from. */}
+                {(entry.org || entry.location) && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-bold">
+                      <mark className={entry.origin === "kept" ? "" : TINT[entry.origin]}>
+                        {entry.org ?? ""}
+                      </mark>
+                      {entry.origin === "moved" && entry.movedFrom && (
+                        <span
+                          className="ml-2 whitespace-nowrap rounded-sm bg-moved px-1 align-middle text-[9px] font-normal uppercase leading-none tracking-wide text-moved-ink"
+                          title={entry.why ?? undefined}
+                        >
+                          moved from {entry.movedFrom}
+                        </span>
+                      )}
+                    </span>
+                    {entry.location && (
+                      <span className="shrink-0 text-[11px]">{entry.location}</span>
                     )}
-                  </span>
-                  {entry.location && (
-                    <span className="shrink-0 text-[11px]">{entry.location}</span>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {(entry.role || entry.dates) && (
                   <div className="flex items-baseline justify-between gap-3 italic">
@@ -210,7 +215,7 @@ export default function ResumeMockup({ doc }: Props) {
                 ))}
 
                 {entry.bullets.length > 0 && (
-                  <ul className="mt-0.5">
+                  <ul className="mt-0.5 space-y-0.5">
                     {entry.bullets.map((b) => (
                       <BulletLine key={b.id} bullet={b} showDiff={showDiff} />
                     ))}

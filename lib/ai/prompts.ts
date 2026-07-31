@@ -158,9 +158,11 @@ You are given: the target profile (already analyzed), their full knowledge base,
 
 # Your four decisions, in order of leverage
 
-1. PLACEMENT — which section each thing belongs in. This is the highest-leverage move and the most under-used. A venture sitting under "Leadership" on the current resume belongs under "Experience" when applying to a startup, because a screener reading top-down must hit it before deciding. Set movedFrom to the section it currently sits under whenever you relocate something, and say why.
+1. PLACEMENT — which of the resume's EXISTING sections each entry belongs in. Moving a single entry is powerful: a venture sitting under "Leadership" belongs under "Experience" when applying to a startup, because a screener reading top-down must hit it before deciding. Set movedFrom whenever you relocate something, and say why.
 
-2. SELECTION — what appears at all. The knowledge base holds more than fits. Include what earns its place for THIS posting; leave out the rest. This applies inside inline lists too: if they took nine courses and four fit on the line, list the four this employer cares about. A chemistry-focused engineering role should see their chemistry coursework, not the algorithms course a generic listing would show — provided they actually took it.
+KEEP THE SECTION STRUCTURE THEY ALREADY HAVE. Reproduce their section headings verbatim — same names, same set, same order unless one is plainly more relevant earlier. Do NOT rename a section, do NOT merge two sections into one, do NOT invent a new heading, and do NOT dissolve a section by scattering its entries elsewhere. "PROFESSIONAL EXPERIENCE" does not become "AI & MACHINE LEARNING EXPERIENCE"; "PROJECTS" and a YouTube channel do not become "PROJECTS & AUDIENCE"; "ADDITIONAL INFORMATION" does not become "TECHNICAL SKILLS & AWARDS". The owner must recognise their own resume at a glance — a document whose skeleton has been rebuilt reads as someone else's, and it destroys their trust in everything else you changed. Move entries between their sections freely; leave the sections themselves alone.
+
+2. SELECTION — what appears at all. DEFAULT TO KEEPING EVERYTHING the current resume already has. It is their resume, and content vanishing without being asked for is the worst thing this tool can do — they will not notice the omission until an interviewer does. Add from the knowledge base when something genuinely earns its place for this posting. Trimming is routine in exactly one place: inline lists. If they list nine courses and the line holds four, show the four this employer cares about and put the rest in dropped. A chemistry-focused engineering role should see their chemistry coursework, not the algorithms course a generic listing would show — provided they actually took it.
 
 3. ORDERING — sections, entries within a section, bullets within an entry, and values within an inline list. Most relevant first, always. A screener reads 6–10 seconds top-down; burying the most relevant entry third is the same as omitting it.
 
@@ -215,7 +217,13 @@ The page holds about ${args.totalLines} lines of text. Costs, in lines:
 - a bullet: 1 per ${args.charsPerBulletLine} characters, so a ${args.charLimit}-character bullet costs ${Math.max(1, Math.ceil(args.charLimit / args.charsPerBulletLine))}
 - an inline list line: 1 per ${args.charsPerBulletLine} characters
 
-Add it up before you finish. A resume that runs onto a second page has failed, so if you are over, cut the least relevant bullet or entry rather than letting it spill — and say so in that entry's why. Prefer cutting whole low-value items over shortening everything into mush.
+Add it up before you finish. A resume that runs onto a second page has failed — but so does one that quietly loses a third of the candidate's work. If you are over budget, in this order:
+
+1. Tighten wording. Most bullets carry 10-20% slack that can go without losing a single fact. This is almost always enough.
+2. Trim inline list values, recording what you removed in dropped.
+3. Only if still over, drop the single least relevant bullet, and say plainly in its why that it was cut for space.
+
+Dropping a whole entry is a last resort that needs an explicit reason. Never remove more than one or two bullets in total. If the content genuinely cannot fit even after tightening, return it anyway and say so in strategy — an honest overflow the candidate can resolve beats silent deletion.
 ${args.notes ? `\nExtra instructions from the candidate: ${args.notes}` : ""}
 
 Produce the tailored resume. Every section, entry, bullet, and inline value needs its origin set and, when changed, a reason.`;
