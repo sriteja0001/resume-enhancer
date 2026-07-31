@@ -165,6 +165,49 @@ export function ChangeLog({ session }: { session: Session }) {
   );
 }
 
+/**
+ * Flags a tailored document whose section structure does not match the source
+ * resume. Catches two things at once: a stale session produced before section
+ * preservation existed, and any future regression that starts renaming or
+ * reordering sections again.
+ */
+export function StructureWarning({ session }: { session: Session }) {
+  const before = session.original.sections.map((s) => s.title);
+  const after = session.tailored.sections.map((s) => s.title);
+  const norm = (v: string[]) => v.map((t) => t.trim().toLowerCase());
+
+  const renamed = norm(after).filter((t) => !norm(before).includes(t));
+  const missing = norm(before).filter((t) => !norm(after).includes(t));
+  const reordered =
+    renamed.length === 0 &&
+    missing.length === 0 &&
+    norm(after).join("|") !== norm(before).join("|");
+
+  if (renamed.length === 0 && missing.length === 0 && !reordered) return null;
+
+  return (
+    <div className="border-2 border-rewritten-ink bg-rewritten p-3 text-xs text-rewritten-ink">
+      <p className="font-bold">
+        This resume&apos;s section structure differs from your original.
+      </p>
+      <ul className="mt-1 flex flex-col gap-0.5">
+        {renamed.length > 0 && (
+          <li>
+            headings not in your resume: {renamed.join(", ")}
+          </li>
+        )}
+        {missing.length > 0 && <li>your headings that are gone: {missing.join(", ")}</li>}
+        {reordered && <li>your sections were reordered</li>}
+      </ul>
+      <p className="mt-1 opacity-80">
+        Sections are supposed to be preserved exactly. If this is an older
+        session, re-run the tailoring — results generated before that rule
+        existed are kept as they were rather than silently rewritten.
+      </p>
+    </div>
+  );
+}
+
 export function AuditWarnings({ session }: { session: Session }) {
   if (session.auditFailures.length === 0) return null;
   return (

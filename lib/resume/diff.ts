@@ -48,6 +48,18 @@ function similarity(a: Set<string>, b: Set<string>): number {
   return shared / (a.size + b.size - shared);
 }
 
+/**
+ * Overlap coefficient — shared tokens over the smaller set. Unlike Jaccard this
+ * survives abbreviation, where one side is deliberately much shorter than the
+ * other ("… (Data Structures & Algorithms)" vs "… (DS&A)").
+ */
+function overlap(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared += 1;
+  return shared / Math.min(a.size, b.size);
+}
+
 interface OriginalEntry {
   section: string;
   orgTokens: Set<string>;
@@ -204,13 +216,20 @@ export function collectDropped(tailored: ResumeDoc, original: ResumeDoc): Resume
     for (const te of ts.entries) {
       for (const list of te.inlineLists) {
         if (list.dropped.length > 0) continue;
-        const present = new Set(list.values.map((v) => normalize(v.text)));
+        const kept = list.values.map((v) => tokens(v.text));
+
         for (const os of original.sections) {
           for (const oe of os.entries) {
             for (const ol of oe.inlineLists) {
               if (normalize(ol.label) !== normalize(list.label)) continue;
               for (const v of ol.values) {
-                if (!present.has(normalize(v.text))) {
+                // Abbreviating a value is not deleting it. Exact matching
+                // reported "Programming Abstractions (Data Structures &
+                // Algorithms)" as cut when it was kept as "(DS&A)", so the same
+                // course rendered twice — once normally, once struck through.
+                const before = tokens(v.text);
+                const survives = kept.some((k) => overlap(before, k) >= 0.6);
+                if (!survives) {
                   list.dropped.push({
                     text: v.text,
                     why: "cut — lower relevance to this posting",

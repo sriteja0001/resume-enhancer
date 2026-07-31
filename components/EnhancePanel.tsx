@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "@/lib/ai/session";
-import { AuditWarnings, ChangeLog, CoverageMatrix, TargetCard } from "./Analytics";
+import {
+  AuditWarnings,
+  ChangeLog,
+  CoverageMatrix,
+  StructureWarning,
+  TargetCard,
+} from "./Analytics";
 import ResumeMockup from "./ResumeMockup";
 
 // Enhance mode: pick a resume, paste the posting, get a rendered tailored
@@ -252,6 +258,7 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
       {session && (
         <>
           <TargetCard session={session} />
+          <StructureWarning session={session} />
           <AuditWarnings session={session} />
 
           {/* mockup + chat, side by side */}

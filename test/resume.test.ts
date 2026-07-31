@@ -302,3 +302,29 @@ test("export auto-fits to one page instead of spilling over", () => {
   }
   assert.ok(fitToOnePage(huge).needsCuts, "reports when content itself must be cut");
 });
+
+test("abbreviating an inline value is not reported as dropping it", () => {
+  // Seen in a real export: "Programming Abstractions (Data Structures &
+  // Algorithms)" was kept as "Programming Abstractions (DS&A)", and exact
+  // matching reported the original as cut — so the same course rendered twice,
+  // once normally and once struck through.
+  const original = blocksToDoc(BLOCKS);
+  const tailored: ResumeDoc = JSON.parse(JSON.stringify(original));
+  const list = tailored.sections[0].entries[0].inlineLists[0];
+  list.values = [
+    { text: "Programming Abstractions (DS&A)", origin: "kept", why: null },
+    { text: "Organic Chemistry", origin: "kept", why: null },
+  ];
+
+  const out = collectDropped(reconcileOrigins(tailored, original), original);
+  const dropped = out.sections[0].entries[0].inlineLists[0].dropped.map((d) => d.text);
+
+  assert.ok(
+    !dropped.some((d) => d.includes("Programming Abstractions")),
+    "the abbreviated course is recognized as surviving"
+  );
+  assert.ok(
+    dropped.some((d) => d.includes("Probability Theory")),
+    "a genuinely removed course is still reported"
+  );
+});
