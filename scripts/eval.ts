@@ -118,13 +118,18 @@ async function judgeTheJudge(examples: CalibrationExample[]): Promise<void> {
     examples.filter((e, i) => (e.verdict === "strong") === (machine[i] >= 6)).length /
     examples.length;
 
-  console.log(`\n  agreement: ${(agreement * 100).toFixed(0)}%   correlation r=${r.toFixed(2)}`);
   console.log(
-    r > 0.6
-      ? "  The critic tracks your taste well enough to trust its scores."
-      : r > 0.3
-        ? "  Weak correlation. Rate more bullets, or treat the scores as advisory."
-        : "  The critic does NOT track your taste. Its scores should not be trusted as-is."
+    `\n  agreement: ${(agreement * 100).toFixed(0)}%   correlation r=${Number.isNaN(r) ? "n/a" : r.toFixed(2)}`
+  );
+  console.log(
+    Number.isNaN(r)
+      ? "  No correlation to compute — one side gave every bullet the same score.\n" +
+          "  If that side is the critic, it is not discriminating at all."
+      : r > 0.6
+        ? "  The critic tracks your taste well enough to trust its scores."
+        : r > 0.3
+          ? "  Weak correlation. Rate more bullets, or treat the scores as advisory."
+          : "  The critic does NOT track your taste. Its scores should not be trusted as-is."
   );
 }
 
