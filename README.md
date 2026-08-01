@@ -13,6 +13,11 @@ page against a specific posting: deciding **what belongs on it**, **in which
 section**, **in what order**, and **how it's described** — and it structurally
 cannot write a number you never gave it.
 
+Then it argues with itself. A reviewer scores every bullet, the generator
+revises, and each rewrite has to win a **blind comparison** against the line it
+replaced before it's allowed onto the page. You see the entire trace, including
+the rewrites that lost.
+
 ---
 
 ## The two modes
@@ -140,6 +145,65 @@ count characters.
 
 ---
 
+## The reviewer loop
+
+The number audit proves a bullet is *true*. It cannot tell you whether the
+bullet is comprehensible or impressive to someone who has never met you. So
+after the resume is drafted, a reviewer scores every bullet through four
+separate lenses — keyword screen, six-second skim, domain expert, and whether
+it survives an interviewer pulling on it — then the generator revises what was
+flagged. Three rounds at most, stopping early once the page is good enough.
+
+The obvious objection is that the reviewer and the generator share a model, so
+they share blind spots. Four things blunt that, none of which remove it:
+
+- **Four genuinely different lenses**, not one opinion in four voices.
+- **Extraction over taste.** The reviewer has to name the artifact, name the
+  outcome, and write the question an interviewer would ask. Questions with
+  checkable answers are the ones a model is least able to fool itself on.
+- **Falsification.** It argues for *cutting* each bullet rather than rating it.
+- **A blind pairwise gate.** Every rewrite is compared against the line it
+  replaced, in randomised order, with neither side labelled — a reviewer shown
+  its own output tends to approve it. This runs per bullet, not per document,
+  so a single weak rewrite cannot throw away the good ones beside it.
+
+A rewrite lands only if it survives the number audit *and* wins its comparison.
+In practice most do not, which is the point.
+
+Because the residual blind spot is real, **the whole trace is shown to you** —
+per-bullet scores, the rewrites that were rejected and why, and the reviewer's
+verdict. You can also rate any bullet strong or weak in the preview; those
+ratings are fed back as calibration examples and anchor the scale to your taste
+rather than the model's.
+
+### What it cannot fix
+
+When the reviewer asks for something no fact in memory supports — an eval
+number you never measured, a repo you never published — the generator refuses
+rather than inventing it, and the refusal is reported to you as *missing
+evidence*. This is usually the most useful thing a run produces: not a better
+sentence, but a specific thing to go get.
+
+### Checking the reviewer
+
+```bash
+npm run eval           # score every posting in eval/postings, before vs after
+npm run eval -- --judge  # check the reviewer's scores against your own ratings
+```
+
+`--judge` is the one that matters. It shows your rated bullets to the reviewer
+as one anonymous batch, with no calibration supplied, and reports agreement and
+correlation. If the reviewer does not track your taste, the loop is theatre —
+and this is the only way you would find out.
+
+The shipped postings are not a random sample. One is squarely in the
+candidate's lane, one rewards moving an entry between sections, one rewards
+surfacing different coursework, and one is **deliberately a bad match**. On that
+last one a low score is the correct output. Any reviewer can be talked into
+approving a good match; the test of a reviewer is whether it says no.
+
+---
+
 ## Quickstart
 
 ```bash
@@ -171,6 +235,8 @@ lib/sources/   text extraction for .docx / .pdf / .md / .txt
 lib/memory/    master.md store · markdown parse/serialize · graph index + ranking
 lib/resume/    ResumeDoc model · .docx parse · origin reconciliation · .docx export
 lib/ai/        Claude client · prompts · schemas · pipeline · code-side audit
+               critic.ts — the reviewer loop and its blind pairwise gate
+eval/postings/ job postings the harness scores against (resumes stay local)
 ```
 
 Word `.docx` is parsed via HTML rather than raw text, because `extractRawText`
@@ -190,6 +256,10 @@ demo mode sends nothing.
 ## Tests
 
 ```bash
-npm test        # master.md round-trip, graph ranking, diff/origins, audit, docx export
+npm test        # master.md round-trip, graph ranking, diff/origins, audit, docx export,
+                # and the reviewer loop's revision bookkeeping
 npm run build   # type-check + build
 ```
+
+`npm test` needs no API key — it covers the deterministic half of the system.
+`npm run eval` does, because it exercises judgment.
