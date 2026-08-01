@@ -107,11 +107,16 @@ export async function critique(args: {
 }
 
 /**
- * Blind A/B. Order is randomised and neither side is labelled, so the model
- * cannot prefer the revision simply because it is the revision. A tie counts
- * as no improvement.
+ * Blind A/B on a single bullet. Order is randomised and neither side is
+ * labelled, so the model cannot prefer the revision simply because it is the
+ * revision. A tie counts as no improvement.
+ *
+ * Judged one bullet at a time rather than a whole document at a time. Comparing
+ * the full set makes the gate all-or-nothing: one bad rewrite drags down ten
+ * good ones and the entire round is thrown away, which is exactly what happened
+ * when this was document-level.
  */
-async function revisionWins(before: string[], after: string[]): Promise<boolean> {
+async function revisionWins(before: string, after: string): Promise<boolean> {
   const afterIsA = Math.random() < 0.5;
   const result = await structuredCall<{ winner: "A" | "B" | "tie"; why: string }>({
     system: PAIRWISE_SYSTEM,
@@ -262,6 +267,7 @@ export async function runCriticLoop(args: {
         instruction: b.instruction,
       })),
       revised: [],
+      unmet: [],
       accepted: null,
       note: stopping
         ? verdict.overallScore >= GOOD_ENOUGH
@@ -297,15 +303,21 @@ export async function runCriticLoop(args: {
       maxTokens: 16000,
     });
 
-    const candidate = structuredClone(doc);
-    const changed = applyRevisions(candidate, revision.bullets);
-
     const current = rounds[rounds.length - 1];
-    current.revised = changed.map((c) => ({ id: c.id, before: c.before, after: c.after }));
+
+    // An instruction the reviser declined is worth more to the candidate than
+    // one it satisfied: it names something the resume cannot currently say.
+    const askedFor = new Map(payload.map((p) => [p.id, p.instruction]));
+    current.unmet = revision.bullets
+      .filter((b) => !b.changed && askedFor.has(b.id))
+      .map((b) => ({ instruction: askedFor.get(b.id)!, why: b.why }));
+
+    const candidate = structuredClone(doc);
+    let changed = applyRevisions(candidate, revision.bullets);
 
     if (changed.length === 0) {
       current.accepted = false;
-      current.note = "Stopped: the revision returned nothing different.";
+      current.note = "Stopped: the reviser had nothing it could truthfully change.";
       break;
     }
 
@@ -316,39 +328,40 @@ export async function runCriticLoop(args: {
       originalText: args.originalText,
       charLimit: args.charLimit,
     });
+    let invented = 0;
     if (violations.length > 0) {
-      const reverted = revertRevisions(
-        candidate,
-        changed,
-        new Set(violations.map((v) => v.text))
-      );
-      const keptIds = new Set(
-        changed.filter((c) => !reverted.some((r) => r.id === c.id)).map((c) => c.id)
-      );
-      current.revised = current.revised.filter((c) => keptIds.has(c.id));
-      if (reverted.length > 0) {
-        current.note = `${reverted.length} revision(s) introduced unsourced numbers and were reverted.`;
-      }
-      if (current.revised.length === 0) {
-        current.accepted = false;
-        current.note = "Stopped: every revision this round invented a number and was reverted.";
-        break;
-      }
+      const reverted = revertRevisions(candidate, changed, new Set(violations.map((v) => v.text)));
+      const undone = new Set(reverted.map((r) => r.id));
+      changed = changed.filter((c) => !undone.has(c.id));
+      invented = reverted.length;
     }
 
-    // Then taste: keep the new version only if it wins blind.
-    const won = await revisionWins(
-      indexBullets(doc).map(({ bullet }) => bullet.text),
-      indexBullets(candidate).map(({ bullet }) => bullet.text)
+    // Then taste, bullet by bullet. Each rewrite has to beat the version it
+    // replaced on its own merits; the ones that don't are rolled back and the
+    // ones that do still land.
+    const outcomes = await Promise.all(
+      changed.map(async (c) => ({ revision: c, won: await revisionWins(c.before, c.after) }))
     );
-    current.accepted = won;
-    if (won) {
-      doc = candidate;
-    } else {
-      current.note = (current.note ? `${current.note} ` : "") +
-        "Blind comparison preferred the previous version, so the revision was discarded.";
+    const rejected = outcomes.filter((o) => !o.won).map((o) => o.revision);
+    revertRevisions(candidate, rejected, new Set(rejected.map((r) => r.after)));
+
+    const kept = outcomes.filter((o) => o.won).map((o) => o.revision);
+    current.revised = kept.map((c) => ({ id: c.id, before: c.before, after: c.after }));
+    current.accepted = kept.length > 0;
+    current.note = [
+      invented > 0 ? `${invented} rewrite(s) invented a number and were reverted.` : null,
+      rejected.length > 0
+        ? `${rejected.length} rewrite(s) lost a blind comparison to the line they replaced.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || null;
+
+    if (kept.length === 0) {
+      current.note = `${current.note ?? ""} Stopped: nothing this round survived.`.trim();
       break;
     }
+    doc = candidate;
   }
 
   // The best-scoring version wins, not the last one produced.

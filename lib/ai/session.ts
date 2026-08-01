@@ -57,8 +57,15 @@ export interface CritiqueRound {
     interviewerFollowUp: string;
     instruction: string | null;
   }[];
+  /** Rewrites that survived both the number audit and the blind comparison. */
   revised: { id: string; before: string; after: string }[];
-  /** Whether the blind comparison kept this round's revision. */
+  /**
+   * Changes the critic asked for that the reviser declined to make, because
+   * nothing in memory supported them. These name what the resume cannot yet
+   * say — often the most useful thing a run produces.
+   */
+  unmet: { instruction: string; why: string | null }[];
+  /** Whether any rewrite this round survived. */
   accepted: boolean | null;
   note: string | null;
 }

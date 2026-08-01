@@ -158,12 +158,20 @@ async function scoreFixtures(
     }
     const first = rounds[0].score;
     const last = rounds[rounds.length - 1].score;
+    const kept = rounds.reduce((n, r) => n + r.revised.length, 0);
     before.push(first);
     after.push(last);
+
+    const pad = " ".repeat(28);
     console.log(
-      `  ${fixture.name.padEnd(28)} ${first}/10 -> ${last}/10  (${rounds.length} round${rounds.length === 1 ? "" : "s"})`
+      `  ${fixture.name.padEnd(28)} ${first}/10 -> ${last}/10  (${rounds.length} round${rounds.length === 1 ? "" : "s"}, ${kept} rewrite${kept === 1 ? "" : "s"} kept)`
     );
-    console.log(`  ${" ".repeat(28)} weakest: ${rounds[rounds.length - 1].weakestLink}`);
+    console.log(`  ${pad} weakest: ${rounds[rounds.length - 1].weakestLink}`);
+
+    // Deduped across rounds: the critic tends to re-ask for the same missing
+    // evidence until the candidate actually goes and gets it.
+    const unmet = [...new Set(rounds.flatMap((r) => (r.unmet ?? []).map((u) => u.instruction)))];
+    for (const ask of unmet) console.log(`  ${pad} needs:   ${ask}`);
   }
 
   if (before.length === 0) return;

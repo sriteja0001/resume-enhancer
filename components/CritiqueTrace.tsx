@@ -108,6 +108,27 @@ export default function CritiqueTrace({ session }: { session: Session }) {
                 </div>
               )}
 
+              {r.unmet && r.unmet.length > 0 && (
+                <div className="mt-2 border border-dashed border-line p-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                    Asked for, but nothing in memory supports it
+                  </p>
+                  <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">
+                    {r.unmet.map((u, i) => (
+                      <li key={i} className="text-[11px] leading-4">
+                        {u.instruction}
+                        {u.why && <span className="text-muted"> — {u.why}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[10px] leading-4 text-muted">
+                    These are not failures of the rewrite. They are things your
+                    resume cannot truthfully say yet — add them to memory in
+                    Intake if you have them.
+                  </p>
+                </div>
+              )}
+
               <button
                 className="mt-2 text-[11px] underline underline-offset-4 text-muted"
                 onClick={() => setExpanded(expanded === r.round ? null : r.round)}

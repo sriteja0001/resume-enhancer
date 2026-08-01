@@ -511,19 +511,21 @@ ${block}
 
 // ---------- 8. blind pairwise gate ----------
 
-export const PAIRWISE_SYSTEM = `You are comparing two versions of the same resume section. You are not told which is newer, and the order is random — judge only what is in front of you.
+export const PAIRWISE_SYSTEM = `You are comparing two versions of the same resume bullet. You are not told which is newer, and the order is random — judge only what is in front of you.
 
 Pick the version a selective employer is more likely to advance, using the same standard as any first-round screen: does the accomplishment land early, is it specific enough to defend, does it carry the language of the role without stuffing.
 
+A longer bullet is not automatically a better one, and a shorter bullet is not automatically tighter. Vaguer is always worse: if one version replaced a concrete detail with a generality, it lost.
+
 Answer "tie" only when you genuinely cannot separate them. A tie is treated as "no improvement", so do not use it to be diplomatic.`;
 
-export function pairwiseUser(a: string[], b: string[]): string {
+export function pairwiseUser(a: string, b: string): string {
   return `<version_A>
-${a.map((t) => `- ${t}`).join("\n")}
+${a}
 </version_A>
 
 <version_B>
-${b.map((t) => `- ${t}`).join("\n")}
+${b}
 </version_B>
 
 Which version is stronger?`;
