@@ -10,14 +10,18 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import type { CalibrationExample } from "../ai/session";
 import { parseMemory, serializeMemory } from "./markdown";
 import type { Entity, Memory } from "./types";
 import { EMPTY_MEMORY } from "./types";
+
+export type { CalibrationExample };
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MEMORY_DIR = path.join(DATA_DIR, "memory");
 const MASTER_PATH = path.join(MEMORY_DIR, "master.md");
 const LEDGER_PATH = path.join(MEMORY_DIR, "sources.json");
+const CALIBRATION_PATH = path.join(MEMORY_DIR, "calibration.json");
 const SOURCES_DIR = path.join(DATA_DIR, "sources");
 const RESUMES_DIR = path.join(DATA_DIR, "resumes");
 const EXPORTS_DIR = path.join(DATA_DIR, "exports");
@@ -310,4 +314,27 @@ export async function listSessions(): Promise<string[]> {
     .map((f) => f.replace(/\.json$/, ""))
     .sort()
     .reverse();
+}
+
+// ---------- calibration ----------
+
+/**
+ * Bullets the candidate has judged themselves. The strongest ground truth this
+ * tool has: they know which of their accomplishments are genuinely impressive
+ * and the model is guessing. Starts empty and works fine empty.
+ */
+export async function loadCalibration(): Promise<CalibrationExample[]> {
+  await ensureDirs();
+  try {
+    return JSON.parse(await fs.readFile(CALIBRATION_PATH, "utf-8")) as CalibrationExample[];
+  } catch {
+    return [];
+  }
+}
+
+export async function addCalibration(example: CalibrationExample): Promise<CalibrationExample[]> {
+  const all = await loadCalibration();
+  const next = [example, ...all.filter((e) => e.text !== example.text)].slice(0, 40);
+  await fs.writeFile(CALIBRATION_PATH, JSON.stringify(next, null, 2), "utf-8");
+  return next;
 }

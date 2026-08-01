@@ -34,6 +34,36 @@ export function OriginLegend() {
   );
 }
 
+function Rate({ text }: { text: string }) {
+  const [sent, setSent] = useState<"strong" | "weak" | null>(null);
+  const rate = async (verdict: "strong" | "weak") => {
+    setSent(verdict);
+    await fetch("/api/calibration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, verdict }),
+    }).catch(() => setSent(null));
+  };
+  return (
+    <span className="ml-1 whitespace-nowrap align-middle text-[10px] opacity-0 transition-opacity group-hover:opacity-100">
+      <button
+        className={`px-0.5 ${sent === "strong" ? "text-added-ink" : "text-muted"} hover:text-added-ink`}
+        title="Strong — teach the reviewer this is the bar"
+        onClick={() => rate("strong")}
+      >
+        ▲
+      </button>
+      <button
+        className={`px-0.5 ${sent === "weak" ? "text-dropped-ink" : "text-muted"} hover:text-dropped-ink`}
+        title="Weak — teach the reviewer this misses"
+        onClick={() => rate("weak")}
+      >
+        ▼
+      </button>
+    </span>
+  );
+}
+
 function BulletLine({ bullet, showDiff }: { bullet: Bullet; showDiff: boolean }) {
   const failed = bullet.why?.startsWith("⚠");
   const tint = bullet.origin === "kept" ? "" : TINT[bullet.origin];
@@ -61,10 +91,11 @@ function BulletLine({ bullet, showDiff }: { bullet: Bullet; showDiff: boolean })
 
   return (
     <li
-      className={`ml-4 list-disc pl-1 leading-snug ${failed ? "outline outline-2 outline-dropped-ink" : ""}`}
+      className={`group ml-4 list-disc pl-1 leading-snug ${failed ? "outline outline-2 outline-dropped-ink" : ""}`}
       title={bullet.why ?? undefined}
     >
       <mark className={tint}>{body}</mark>
+      <Rate text={bullet.text} />
       {bullet.origin !== "kept" && bullet.why && !failed && (
         <span className="ml-1 cursor-help text-[10px] text-muted" title={bullet.why}>
           ⓘ

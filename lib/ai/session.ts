@@ -26,6 +26,43 @@ export interface CoverageRow {
   literal: boolean;
 }
 
+/**
+ * A bullet the candidate has judged; anchors the critic's scale to their taste.
+ * Declared here rather than beside its storage because it is a shape the AI
+ * layer reasons about — lib/memory/store.ts imports it back for persistence.
+ */
+export interface CalibrationExample {
+  text: string;
+  verdict: "strong" | "weak";
+  note: string | null;
+  ratedAt: string;
+}
+
+export interface CritiqueRound {
+  round: number;
+  score: number;
+  weakestLink: string;
+  verdict: string;
+  bulletScores: {
+    id: string;
+    score: number;
+    lenses: {
+      atsScreen: number;
+      sixSecondSkim: number;
+      domainExpert: number;
+      interviewDefense: number;
+    };
+    namedArtifact: string | null;
+    namedOutcome: string | null;
+    interviewerFollowUp: string;
+    instruction: string | null;
+  }[];
+  revised: { id: string; before: string; after: string }[];
+  /** Whether the blind comparison kept this round's revision. */
+  accepted: boolean | null;
+  note: string | null;
+}
+
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
@@ -45,6 +82,8 @@ export interface Session {
   /** Audit problems that survived the corrective turn — shown, never hidden. */
   auditFailures: { where: string; text: string; issues: string[] }[];
   chat: ChatTurn[];
+  /** The critic loop's trace, shown rather than hidden. */
+  critique: CritiqueRound[];
   exportedPath: string | null;
   demo: boolean;
 }

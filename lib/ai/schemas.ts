@@ -290,3 +290,84 @@ export const POLISH_SCHEMA = {
     },
   },
 } as const;
+
+/**
+ * The critic's verdict. Deliberately weighted toward extraction rather than
+ * opinion: naming the artifact and writing the interviewer's follow-up are
+ * tasks with checkable answers, where a model that shares the generator's
+ * blind spots is least able to fool itself.
+ */
+export const CRITIC_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["bullets", "overallScore", "weakestLink", "verdict"],
+  properties: {
+    bullets: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "id",
+          "atsScreen",
+          "sixSecondSkim",
+          "domainExpert",
+          "interviewDefense",
+          "score",
+          "namedArtifact",
+          "namedOutcome",
+          "interviewerFollowUp",
+          "caseForCutting",
+          "instruction",
+        ],
+        properties: {
+          id: { type: "string" },
+          atsScreen: { type: "integer", description: "1-10: carries the terms this posting is screened on." },
+          sixSecondSkim: { type: "integer", description: "1-10: lands with a recruiter who reads only the first half." },
+          domainExpert: { type: "integer", description: "1-10: credible and non-trivial to someone who knows the field." },
+          interviewDefense: { type: "integer", description: "1-10: specific enough to survive being probed." },
+          score: { type: "integer", description: "1-10 overall." },
+          namedArtifact: {
+            ...NULLABLE_STRING,
+            description: "The concrete thing built, named. Null if the bullet does not identify one — which is itself the finding.",
+          },
+          namedOutcome: {
+            ...NULLABLE_STRING,
+            description: "What measurably changed. Null if the bullet states activity only.",
+          },
+          interviewerFollowUp: {
+            type: "string",
+            description: "The question a sharp interviewer would ask. A trivial question means a thin bullet.",
+          },
+          caseForCutting: {
+            type: "string",
+            description: "The strongest argument for deleting this bullet entirely.",
+          },
+          instruction: {
+            ...NULLABLE_STRING,
+            description: "One concrete change. Null only when the bullet genuinely cannot be improved.",
+          },
+        },
+      },
+    },
+    overallScore: { type: "integer", description: "1-10 for the resume as a whole." },
+    weakestLink: { type: "string", description: "The single biggest problem with this resume." },
+    verdict: { type: "string", description: "2-3 sentences: would this candidate get the screen, and why." },
+  },
+} as const;
+
+/**
+ * Blind comparison used as the regression gate. Models rank pairs far more
+ * reliably than they score in the absolute, and a critic shown its own output
+ * tends to approve it — so the two versions arrive unlabelled and in random
+ * order, and the caller alone knows which is which.
+ */
+export const PAIRWISE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["winner", "why"],
+  properties: {
+    winner: { type: "string", enum: ["A", "B", "tie"] },
+    why: { type: "string" },
+  },
+} as const;

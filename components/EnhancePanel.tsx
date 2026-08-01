@@ -9,6 +9,7 @@ import {
   StructureWarning,
   TargetCard,
 } from "./Analytics";
+import CritiqueTrace from "./CritiqueTrace";
 import ResumeMockup from "./ResumeMockup";
 
 // Enhance mode: pick a resume, paste the posting, get a rendered tailored
@@ -366,6 +367,8 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
           </div>
 
           {/* analytics */}
+          <CritiqueTrace session={session} />
+
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <p className="text-xs leading-5">{session.strategy}</p>
             <div className="flex gap-4 border-b border-line pb-2 text-xs">

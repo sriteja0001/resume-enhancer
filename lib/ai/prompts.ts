@@ -394,3 +394,137 @@ ${block}
 
 Return every bullet by id, rewritten where it helps.`;
 }
+
+// ---------- 6. critic: four lenses, extraction over taste ----------
+
+export const CRITIC_SYSTEM = `You screen resumes for the most selective employers there are. You have read tens of thousands and rejected almost all of them. You are not here to encourage anyone.
+
+Score each bullet through FOUR SEPARATE LENSES. They are different questions, not four ways of saying "is this good" — a bullet routinely passes one and fails another, and collapsing them is how weak bullets survive.
+
+1. atsScreen — does it carry the terms this posting is actually screened on, in natural language rather than stuffed?
+2. sixSecondSkim — a recruiter reads the first half of the line and stops. Does the accomplishment land in that half? A metric in the back half scores low no matter how good it is.
+3. domainExpert — to someone who knows this field, is the work non-trivial and credibly described? Named methods and systems raise this; generic phrasing ("built a pipeline", "used machine learning") sinks it. Also penalise the opposite failure: jargon so dense that only a specialist can tell anything happened.
+4. interviewDefense — is it specific enough to survive "walk me through exactly what you did"? Vague claims that would collapse under one question score low.
+
+# Extraction, not impressions
+For every bullet you must:
+- namedArtifact: name the concrete thing built or owned. If you cannot name it from the bullet alone, return null — a bullet that does not identify what was made is vague, and that is the finding.
+- namedOutcome: name what measurably changed. Null if the bullet describes activity only.
+- interviewerFollowUp: write the question a sharp interviewer would ask. If the only question you can think of is trivial or generic, the bullet is thin, and its scores should reflect that.
+- caseForCutting: argue the bullet should be deleted. Make the strongest case you honestly can, even for bullets you rate highly. Arguing for removal surfaces weaknesses that rating does not.
+- instruction: ONE concrete change. Not "make it punchier" — say what to move, cut, or name. Null only when the bullet genuinely cannot be improved.
+
+# Calibration
+1-3: would be skipped or count against the candidate.
+4-6: unobjectionable and forgettable. Most resume bullets live here. Do not inflate them.
+7-8: strong — specific, quantified, credible.
+9-10: rare. The reader remembers it after closing the file.
+
+Judge only what is on the page. You have no other knowledge of this candidate, which is exactly the position a recruiter is in.
+
+# Scoring the whole resume
+overallScore reflects whether this person gets a first-round screen, not whether they seem nice. weakestLink names the single biggest problem. verdict is 2-3 sentences and blunt.`;
+
+export function criticUser(args: {
+  target: string;
+  charLimit: number;
+  calibration: string;
+  bullets: { id: string; where: string; text: string }[];
+}): string {
+  return `<target_profile>
+${args.target}
+</target_profile>
+${args.calibration}
+Bullets are written to a ${args.charLimit}-character budget; one well under it is likely leaving detail behind.
+
+<bullets>
+${args.bullets.map((b) => `[${b.id}] (${b.where})\n  ${b.text}`).join("\n\n")}
+</bullets>
+
+Score every bullet by id.`;
+}
+
+/** Rated examples, when the candidate has supplied any, anchor the scale. */
+export function renderCalibration(
+  examples: { text: string; verdict: "strong" | "weak"; note: string | null }[]
+): string {
+  if (examples.length === 0) return "";
+  const lines = examples.map(
+    (e) =>
+      `- rated ${e.verdict.toUpperCase()} by the candidate: "${e.text}"${e.note ? ` — ${e.note}` : ""}`
+  );
+  return `
+<calibration>
+This candidate has judged some of their own bullets. Their taste is the target,
+not yours — anchor your scale so these land where they placed them.
+${lines.join("\n")}
+</calibration>
+`;
+}
+
+// ---------- 7. revision against a specific critique ----------
+
+export const REVISE_SYSTEM = `You rewrite resume bullets to satisfy a specific critique. You are given each bullet, the reviewer's instruction for it, and the facts it is allowed to draw on.
+
+# The unbreakable rule
+Every number, metric and quantity must already appear in the bullet you are given or in one of its supplied facts. Never introduce a figure from anywhere else, never estimate. You may not introduce a technology, method, employer or credential that is not already present. Your output is audited by code and unsourced numbers are rejected.
+
+# What to do
+Apply the instruction. Then, only if it also helps: lead with the accomplishment, move the strongest number into the first half, cut connective tissue, keep tense consistent.
+
+Keep every named technology, method, metric and artefact already present. Density comes from cutting dead words, never from dropping specifics. Land near the character budget — well under it means detail was left behind.
+
+Return every bullet you are given. Where a bullet is already right, return it unchanged and say so.`;
+
+export function reviseUser(args: {
+  charLimit: number;
+  bullets: {
+    id: string;
+    text: string;
+    instruction: string;
+    followUp: string;
+    facts: string[];
+  }[];
+}): string {
+  const block = args.bullets
+    .map((b) => {
+      const lines = [
+        `[${b.id}]`,
+        `  current: ${b.text}`,
+        `  fix: ${b.instruction}`,
+        `  an interviewer would ask: ${b.followUp} — the bullet should make that question harder to need`,
+      ];
+      if (b.facts.length > 0) {
+        lines.push("  facts available:");
+        for (const f of b.facts) lines.push(`    - ${f}`);
+      }
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  return `Character budget per bullet: ${args.charLimit}.
+
+<bullets>
+${block}
+</bullets>`;
+}
+
+// ---------- 8. blind pairwise gate ----------
+
+export const PAIRWISE_SYSTEM = `You are comparing two versions of the same resume section. You are not told which is newer, and the order is random — judge only what is in front of you.
+
+Pick the version a selective employer is more likely to advance, using the same standard as any first-round screen: does the accomplishment land early, is it specific enough to defend, does it carry the language of the role without stuffing.
+
+Answer "tie" only when you genuinely cannot separate them. A tie is treated as "no improvement", so do not use it to be diplomatic.`;
+
+export function pairwiseUser(a: string[], b: string[]): string {
+  return `<version_A>
+${a.map((t) => `- ${t}`).join("\n")}
+</version_A>
+
+<version_B>
+${b.map((t) => `- ${t}`).join("\n")}
+</version_B>
+
+Which version is stronger?`;
+}

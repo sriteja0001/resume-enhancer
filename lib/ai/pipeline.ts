@@ -42,10 +42,12 @@ import {
   targetUser,
 } from "./prompts";
 import { INTAKE_SCHEMA, TAILOR_SCHEMA, TARGET_SCHEMA } from "./schemas";
-import type { CoverageRow, Session, TargetProfile } from "./session";
+import type { CoverageRow, CritiqueRound, Session, TargetProfile } from "./session";
 import { newSessionId } from "./session";
 import { auditDoc, literallyContains, markFailures } from "./validate";
 import { reviewBullets } from "./quality";
+import { runCriticLoop } from "./critic";
+import { loadCalibration } from "../memory/store";
 import { renderRankedEvidence } from "./evidence";
 import { POLISH_SYSTEM, polishUser } from "./prompts";
 import { POLISH_SCHEMA } from "./schemas";
@@ -434,6 +436,7 @@ export async function tailor(args: {
   let coverage: CoverageRow[];
   let strategy: string;
   let auditFailures: { where: string; text: string; issues: string[] }[] = [];
+  let critique: CritiqueRound[] = [];
 
   if (isDemo()) {
     target = demoTarget(args.jobDescription);
@@ -485,8 +488,9 @@ export async function tailor(args: {
     }
     auditFailures = failures;
 
-    // Craft pass last: the document is structurally settled and factually
-    // clean, so wording can be improved without disturbing either.
+    // Craft last: the document is structurally settled and factually clean, so
+    // wording can be improved without disturbing either. Code checks run first
+    // as a free filter, then the critic judges what code cannot see.
     const polished = await polishBullets({
       doc,
       memory,
@@ -495,6 +499,17 @@ export async function tailor(args: {
       originalText: plainText,
     });
     doc = polished.doc;
+
+    const loop = await runCriticLoop({
+      doc,
+      memory,
+      target,
+      charLimit: args.charLimit,
+      originalText: plainText,
+      calibration: await loadCalibration(),
+    });
+    doc = loop.doc;
+    critique = loop.rounds;
 
     auditFailures = auditDoc({
       doc,
@@ -539,6 +554,7 @@ export async function tailor(args: {
     strategy,
     auditFailures,
     chat: [],
+    critique,
     exportedPath: null,
     demo: isDemo(),
   };

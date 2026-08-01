@@ -240,11 +240,11 @@ test("exported docx does not inherit Word's default styling", async () => {
   const document = await zip.file("word/document.xml")!.async("string");
   const numbering = await zip.file("word/numbering.xml")!.async("string");
 
-  const heading2 = /<w:style [^>]*w:styleId="Heading2".*?<\/w:style>/s.exec(styles)?.[0] ?? "";
+  const heading2 = /<w:style [^>]*w:styleId="Heading2"[\s\S]*?<\/w:style>/.exec(styles)?.[0] ?? "";
   assert.ok(heading2, "Heading2 is redefined rather than inherited");
   assert.match(heading2, /<w:color w:val="000000"\/>/, "headings are black, not Word's blue");
 
-  const paragraphs = document.match(/<w:p>.*?<\/w:p>/gs) ?? [];
+  const paragraphs = document.match(/<w:p>[\s\S]*?<\/w:p>/g) ?? [];
   const textOf = (p: string) =>
     (p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) ?? []).join("").replace(/<[^>]+>/g, "").trim();
   assert.equal(
