@@ -264,3 +264,29 @@ export const TAILOR_SCHEMA = {
     },
   },
 } as const;
+
+/** Polish pass: bullets only, keyed by id so they map back onto the document. */
+export const POLISH_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["bullets"],
+  properties: {
+    bullets: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "text", "changed", "why"],
+        properties: {
+          id: { type: "string" },
+          text: { type: "string" },
+          changed: {
+            type: "boolean",
+            description: "false when the bullet was already good and is returned unaltered.",
+          },
+          why: NULLABLE_STRING,
+        },
+      },
+    },
+  },
+} as const;

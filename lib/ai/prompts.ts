@@ -172,6 +172,33 @@ SPECIFICITY IS THE ENTIRE VALUE OF A BULLET. The named method, the named system,
 
 So: re-angle, do not summarise. Keep every named technology, method, metric and artefact from the original unless the posting makes one actively irrelevant. A rewritten bullet should land near the character budget you are given, not at half of it — coming in far under budget means you deleted detail you had room for. If you find yourself dropping a technical term to save space, you are optimising the wrong thing.
 
+# How a bullet should read
+- Lead with the accomplishment, not the activity. The first three words decide whether the rest gets read.
+- Put the strongest number in the FIRST HALF of the sentence. A metric parked at the end of a 200-character line is skimmed past.
+- One clause of context, maximum. Scope, method, or constraint — pick the one that matters here.
+- Keep tense consistent within an entry: past for finished work, present only for a current role.
+- Never a bare list of activities. "Benchmarked A, B, and C, applied D, and separated E" is three verbs and no result; say what it produced.
+- Fuse related facts rather than spending a whole bullet on each. Two facts about the same system usually belong in one dense line.
+- Strong, specific verbs: architected, shipped, cut, grew, automated, deployed. Not: completed, participated, assisted, worked on, was responsible for, helped, gained exposure to.
+
+Weak, and why:
+  "Completed AI Engineering Bootcamp (15% acceptance rate, youngest certified), shipping MCP servers and RAG systems."
+  -> opens on attendance; the achievement is buried behind the fact that a course was finished.
+Strong:
+  "Earned certification as the youngest engineer in a 15%-acceptance AI cohort, shipping MCP servers and production RAG with LangGraph and on-prem LLM deployment."
+
+Weak, and why:
+  "Architected a hierarchical 3-model KNN system classifying mental health intervention across 2,600 elementary school students, reaching 94.5% accuracy with 100% precision."
+  -> the 94.5% is the whole point and it arrives last.
+Strong:
+  "Hit 94.5% accuracy and 100% precision on primary risk detection with a hierarchical 3-model KNN classifier over 2,600 elementary students."
+
+Weak, and why:
+  "Manage a 12+ member team, executed 200+ content cycles, and amassed a 24K+ Udemy student community."
+  -> half the budget, three unrelated items, mixed tense, and "amassed" is filler.
+Strong:
+  "Grew a 24K+ student community while directing a 12-person team through 200+ content cycles, sustaining the brand's organic acquisition."
+
 # The unbreakable rule
 Every number, metric, and quantity you write must come from a fact you cite in factRefs, or from the original resume bullet you are rewriting. Never estimate, never round a guess into existence, never write a placeholder. If no number exists for something, write it strongly without one. Your output is audited by code that extracts every number and checks it against your cited sources; unsourced numbers are rejected and shown to the user as an error.
 
@@ -194,6 +221,7 @@ The "why" fields are shown to the user next to each change. Write them specific 
 export function tailorUser(args: {
   target: string;
   memory: Memory;
+  evidence: string;
   currentResume: ResumeDoc;
   charLimit: number;
   notes: string | null;
@@ -205,7 +233,7 @@ ${args.target}
 </target_profile>
 
 <knowledge_base>
-${renderMemory(args.memory)}
+${args.evidence}
 </knowledge_base>
 
 <current_resume>
@@ -306,4 +334,63 @@ export function summarizeEntities(entities: Entity[]): string {
   return entities
     .map((e) => `${e.title} (${e.facts.length} facts, ${e.items.length} items)`)
     .join("; ");
+}
+
+
+// ---------- 5. polish: a second pass over the prose alone ----------
+
+export const POLISH_SYSTEM = `You are rewriting the bullet points of a resume that has already been structured and fact-checked. Structure, section order, entry placement and selection are settled — do not revisit them. Your only job is to make each bullet read as well as it possibly can.
+
+# The unbreakable rule, unchanged
+Every number, metric and quantity must already appear in the bullet you are given or in one of the facts supplied with it. Never introduce a figure from anywhere else, never estimate, never round a guess into existence. Your output is audited by code that checks every number against those sources. You may also not introduce a technology, method, employer or credential that is not already present in the bullet or its facts.
+
+# What to fix
+You are given specific problems found in each bullet. Fix those, and improve anything else that falls short of the standard below. Return every bullet you are given, including ones with no reported problems if you can sharpen them — but leave a bullet exactly as it is when it is already good. Unnecessary churn is a cost.
+
+# The standard
+- Lead with the accomplishment. The first three words decide whether the rest is read.
+- The strongest number belongs in the first half of the sentence.
+- One clause of context, maximum.
+- Consistent tense within an entry.
+- One claim with a result, never a list of activities.
+- Fuse related facts into one dense line rather than spending a bullet on each.
+- Use the character budget. A bullet at half the budget has left detail behind; a bullet over it will be rejected.
+- Strong specific verbs. Banned: completed, participated, assisted, worked on, responsible for, helped, spearheaded, leveraged, utilized, various, numerous, successfully, effectively, amassed.
+
+Keep every named technology, method, metric and artefact that is already in the bullet. Density comes from cutting connective tissue and dead words, never from dropping specifics.`;
+
+export function polishUser(args: {
+  target: string;
+  charLimit: number;
+  bullets: {
+    id: string;
+    where: string;
+    text: string;
+    problems: string[];
+    facts: string[];
+  }[];
+}): string {
+  const block = args.bullets
+    .map((b) => {
+      const lines = [`[${b.id}] (${b.where})`, `  current: ${b.text}`];
+      if (b.problems.length > 0) lines.push(`  problems: ${b.problems.join("; ")}`);
+      if (b.facts.length > 0) {
+        lines.push("  facts you may draw numbers and specifics from:");
+        for (const f of b.facts) lines.push(`    - ${f}`);
+      }
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  return `<target_profile>
+${args.target}
+</target_profile>
+
+Character budget per bullet: ${args.charLimit}. Aim close to it.
+
+<bullets>
+${block}
+</bullets>
+
+Return every bullet by id, rewritten where it helps.`;
 }
