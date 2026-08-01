@@ -184,6 +184,27 @@ rather than inventing it, and the refusal is reported to you as *missing
 evidence*. This is usually the most useful thing a run produces: not a better
 sentence, but a specific thing to go get.
 
+### What a run costs
+
+The loop is not cheap, and pretending otherwise would be dishonest. One
+tailored resume is:
+
+| | calls |
+| --- | --- |
+| read the posting | 1 |
+| draft the page | 1, plus 1 correction if the number audit rejects anything |
+| craft pass over the prose | 1 |
+| each reviewer round | 1 review + 1 revision + **one blind comparison per proposed rewrite** |
+
+With ten bullets flagged in a round, that round alone is a dozen calls, and
+there can be three rounds. Expect tens of calls and **minutes, not seconds**.
+The comparisons within a round run concurrently, which is what keeps that
+tolerable.
+
+If you want it cheaper, `GOOD_ENOUGH` and `MAX_ROUNDS` in `lib/ai/critic.ts`
+are the two knobs. Lowering `MAX_ROUNDS` to 1 costs you most of the loop and
+saves most of the money.
+
 ### Checking the reviewer
 
 ```bash
