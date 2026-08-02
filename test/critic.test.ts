@@ -5,7 +5,15 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyRevisions, revertRevisions } from "../lib/ai/critic";
+import {
+  DEFAULT_ROUNDS,
+  MAX_ROUNDS,
+  applyRevisions,
+  clampRounds,
+  revertRevisions,
+  runCriticLoop,
+} from "../lib/ai/critic";
+import { EMPTY_MEMORY } from "../lib/memory/types";
 import type { Bullet, ResumeDoc } from "../lib/resume/model";
 
 const docWith = (bullets: Partial<Bullet>[]): ResumeDoc => ({
@@ -81,6 +89,41 @@ test("reverting a rejected revision restores the highlight state too", () => {
   assert.equal(bulletsOf(doc)[0].text, "Ran the study.");
   assert.equal(bulletsOf(doc)[0].origin, "kept");
   assert.equal(bulletsOf(doc)[0].originalText, null);
+});
+
+test("the round setting is clamped rather than trusted", () => {
+  // It arrives from a JSON request body, so every shape has to land somewhere.
+  assert.equal(clampRounds(0), 0);
+  assert.equal(clampRounds(1), 1);
+  assert.equal(clampRounds(99), MAX_ROUNDS);
+  assert.equal(clampRounds(-4), 0);
+  assert.equal(clampRounds("2"), 2);
+  assert.equal(clampRounds(2.7), 2);
+  assert.equal(clampRounds(undefined), DEFAULT_ROUNDS);
+  assert.equal(clampRounds("not a number"), DEFAULT_ROUNDS);
+});
+
+test("zero rounds returns the document untouched and makes no model call", async () => {
+  // No API key is configured under test, so any call would throw. Reaching the
+  // end proves the loop short-circuits before talking to anything.
+  const doc = docWith([{ text: "Left exactly as it was." }]);
+  const result = await runCriticLoop({
+    doc,
+    memory: structuredClone(EMPTY_MEMORY),
+    target: {
+      roleTitle: "x", roleFamily: "x", seniority: "x", companyType: "x",
+      domains: [], mustHaveSkills: [], niceToHaveSkills: [],
+      requirements: [], readStrategy: "x",
+    },
+    charLimit: 200,
+    originalText: "Left exactly as it was.",
+    calibration: [],
+    maxRounds: 0,
+  });
+
+  assert.equal(result.rounds.length, 0);
+  assert.equal(result.doc, doc);
+  assert.equal(bulletsOf(result.doc)[0].text, "Left exactly as it was.");
 });
 
 test("reverting one bullet leaves the others alone", () => {

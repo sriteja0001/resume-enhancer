@@ -3,6 +3,8 @@
 //   npm run eval                      score every posting in eval/postings
 //   npm run eval -- --only=chemistry  just the ones whose name matches
 //   npm run eval -- --resume=old.docx pick a resume other than the first
+//   npm run eval -- --rounds=1        cheaper: cap the reviewer at one round
+//   npm run eval -- --keep            leave the sessions behind to inspect
 //   npm run eval -- --judge           check the critic against your own labels
 //
 // The second matters more. A critic that shares a model with the generator can
@@ -12,11 +14,11 @@
 
 import { readFileSync, readdirSync, existsSync } from "fs";
 import path from "path";
-import { critique } from "../lib/ai/critic";
+import { DEFAULT_ROUNDS, clampRounds, critique } from "../lib/ai/critic";
 import { isDemo } from "../lib/ai/client";
 import type { CalibrationExample, TargetProfile } from "../lib/ai/session";
 import { tailor } from "../lib/ai/pipeline";
-import { listResumes, loadCalibration } from "../lib/memory/store";
+import { deleteSession, listResumes, loadCalibration } from "../lib/memory/store";
 import type { ResumeDoc } from "../lib/resume/model";
 
 const FIXTURES = path.join(process.cwd(), "eval", "postings");
@@ -136,9 +138,12 @@ async function judgeTheJudge(examples: CalibrationExample[]): Promise<void> {
 async function scoreFixtures(
   fixtures: Fixture[],
   resume: string,
-  calibration: CalibrationExample[]
+  calibration: CalibrationExample[],
+  opts: { reviewRounds: number; keep: boolean }
 ) {
-  console.log(`Scoring ${fixtures.length} posting(s) against ${resume}\n`);
+  console.log(
+    `Scoring ${fixtures.length} posting(s) against ${resume}, ${opts.reviewRounds} review round(s)\n`
+  );
   const before: number[] = [];
   const after: number[] = [];
 
@@ -150,8 +155,12 @@ async function scoreFixtures(
         jobDescription: fixture.jobDescription,
         charLimit: fixture.charLimit ?? 200,
         notes: null,
+        reviewRounds: opts.reviewRounds,
       });
       rounds = session.critique;
+      // An eval run is not one of your tailoring sessions, and four of them per
+      // run would bury the real ones in the history dropdown.
+      if (!opts.keep) await deleteSession(session.id);
     } catch (err) {
       // One bad posting should not cost you the whole run.
       console.log(`  ${fixture.name.padEnd(28)} FAILED  ${err instanceof Error ? err.message : err}`);
@@ -228,7 +237,11 @@ async function main() {
   await scoreFixtures(
     only ? fixtures.filter((f) => f.name.includes(only)) : fixtures,
     resume,
-    calibration
+    calibration,
+    {
+      reviewRounds: clampRounds(flag("rounds") ?? DEFAULT_ROUNDS),
+      keep: process.argv.includes("--keep"),
+    }
   );
 }
 

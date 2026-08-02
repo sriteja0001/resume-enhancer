@@ -16,6 +16,29 @@ import ResumeMockup from "./ResumeMockup";
 // resume with a chat beside it. Save writes a NEW .docx — your original file
 // is never touched.
 
+// The reviewer scores, then revises, then scores again — so N rounds buys N-1
+// revision passes, and each pass costs one blind comparison per rewrite it
+// proposes. That is the whole basis of this choice, so the options are named
+// for what you get and the times are the ones actually measured on an
+// eleven-bullet resume, not estimates.
+const REVIEW_OPTIONS = [
+  {
+    rounds: 0,
+    label: "off · fastest",
+    hint: "Draft and craft pass only — no scoring, no rewrites, no trace. Around 3 minutes.",
+  },
+  {
+    rounds: 2,
+    label: "one revision pass",
+    hint: "Scores the page, rewrites what it flags, then scores the result. Reports what your resume cannot yet say. Around 6 minutes.",
+  },
+  {
+    rounds: 3,
+    label: "thorough",
+    hint: "Up to two revision passes, stopping early once the page scores 8/10. Around 10 minutes.",
+  },
+] as const;
+
 interface SessionMeta {
   id: string;
   createdAt: string;
@@ -35,6 +58,7 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
   const [jd, setJd] = useState("");
   const [notes, setNotes] = useState("");
   const [charLimit, setCharLimit] = useState(200);
+  const [reviewRounds, setReviewRounds] = useState(3);
   const [session, setSession] = useState<Session | null>(null);
   const [history, setHistory] = useState<SessionMeta[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -93,7 +117,7 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
       const res = await fetch("/api/tailor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resume, jobDescription: jd, charLimit, notes }),
+        body: JSON.stringify({ resume, jobDescription: jd, charLimit, notes, reviewRounds }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Tailoring failed");
@@ -198,6 +222,20 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
               onChange={(e) => setCharLimit(Number(e.target.value) || 200)}
             />
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">review</label>
+            <select
+              className="border border-line bg-white px-2 py-2 font-mono text-xs focus:border-foreground focus:outline-none"
+              value={reviewRounds}
+              onChange={(e) => setReviewRounds(Number(e.target.value))}
+            >
+              {REVIEW_OPTIONS.map((o) => (
+                <option key={o.rounds} value={o.rounds}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {history.length > 0 && (
             <select
               className="border border-line bg-white px-2 py-2 font-mono text-xs focus:border-foreground focus:outline-none"
@@ -248,6 +286,11 @@ export default function EnhancePanel({ resumes, memoryEmpty, onGoToIntake }: Pro
             {busy === "tailor" ? `tailoring… ${elapsed}s` : "Tailor"}
           </button>
         </div>
+
+        <p className="text-[11px] leading-4 text-muted">
+          <span className="font-bold">review:</span>{" "}
+          {REVIEW_OPTIONS.find((o) => o.rounds === reviewRounds)?.hint}
+        </p>
       </div>
 
       {error && (

@@ -26,7 +26,19 @@ export default function CritiqueTrace({ session }: { session: Session }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const rounds = session.critique ?? [];
-  if (rounds.length === 0) return null;
+
+  // An empty trace because the reviewer was switched off reads exactly like an
+  // empty trace because it crashed. Say which.
+  if (rounds.length === 0) {
+    if (session.reviewRounds !== 0) return null;
+    return (
+      <p className="border border-dashed border-line p-3 text-[11px] leading-4 text-muted">
+        Reviewer was off for this run — the page is the draft plus the craft
+        pass, with no scoring and no blind comparison behind it. Re-run with
+        review set to 1 or 3 rounds to get a trace.
+      </p>
+    );
+  }
 
   const first = rounds[0].score;
   const last = rounds[rounds.length - 1].score;

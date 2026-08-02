@@ -46,7 +46,7 @@ import type { CoverageRow, CritiqueRound, Session, TargetProfile } from "./sessi
 import { newSessionId } from "./session";
 import { auditDoc, literallyContains, markFailures } from "./validate";
 import { reviewBullets } from "./quality";
-import { runCriticLoop } from "./critic";
+import { DEFAULT_ROUNDS, clampRounds, runCriticLoop } from "./critic";
 import { loadCalibration } from "../memory/store";
 import { renderRankedEvidence } from "./evidence";
 import { POLISH_SYSTEM, polishUser } from "./prompts";
@@ -415,7 +415,10 @@ export async function tailor(args: {
   jobDescription: string;
   charLimit: number;
   notes: string | null;
+  /** Reviewer rounds to allow, 0–3. Omitted means the full loop. */
+  reviewRounds?: number;
 }): Promise<Session> {
+  const reviewRounds = isDemo() ? 0 : clampRounds(args.reviewRounds ?? DEFAULT_ROUNDS);
   const path = await resolveResume(args.resumeName);
   if (!path) throw new Error(`Unknown resume: ${args.resumeName}`);
 
@@ -507,6 +510,7 @@ export async function tailor(args: {
       charLimit: args.charLimit,
       originalText: plainText,
       calibration: await loadCalibration(),
+      maxRounds: reviewRounds,
     });
     doc = loop.doc;
     critique = loop.rounds;
@@ -555,6 +559,7 @@ export async function tailor(args: {
     auditFailures,
     chat: [],
     critique,
+    reviewRounds,
     exportedPath: null,
     demo: isDemo(),
   };

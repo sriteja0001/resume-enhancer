@@ -306,6 +306,11 @@ export async function loadSession<T>(id: string): Promise<T | null> {
   }
 }
 
+export async function deleteSession(id: string): Promise<void> {
+  if (!ID_RE.test(id)) return;
+  await fs.rm(path.join(SESSIONS_DIR, `${id}.json`), { force: true });
+}
+
 export async function listSessions(): Promise<string[]> {
   await ensureDirs();
   const entries = await fs.readdir(SESSIONS_DIR);

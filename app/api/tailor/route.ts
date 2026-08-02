@@ -1,5 +1,6 @@
 // POST /api/tailor — Enhance mode. Resume + posting → tailored session.
 
+import { clampRounds } from "@/lib/ai/critic";
 import { tailor } from "@/lib/ai/pipeline";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
       jobDescription: body.jobDescription.trim(),
       charLimit: Number(body.charLimit) || 200,
       notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null,
+      reviewRounds: clampRounds(body.reviewRounds),
     });
     return Response.json(session);
   } catch (err) {

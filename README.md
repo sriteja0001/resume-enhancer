@@ -194,16 +194,23 @@ tailored resume is:
 | read the posting | 1 |
 | draft the page | 1, plus 1 correction if the number audit rejects anything |
 | craft pass over the prose | 1 |
-| each reviewer round | 1 review + 1 revision + **one blind comparison per proposed rewrite** |
+| each reviewer round | 1 review, and — except on the last round — 1 revision plus **one blind comparison per proposed rewrite** |
 
-With ten bullets flagged in a round, that round alone is a dozen calls, and
-there can be three rounds. Expect tens of calls and **minutes, not seconds**.
-The comparisons within a round run concurrently, which is what keeps that
-tolerable.
+The reviewer scores, revises, then scores again, so N rounds buys N−1 revision
+passes. With ten bullets flagged, a single pass is a dozen calls. Expect tens
+of calls and **minutes, not seconds**; the comparisons within a pass run
+concurrently, which is what keeps it tolerable.
 
-If you want it cheaper, `GOOD_ENOUGH` and `MAX_ROUNDS` in `lib/ai/critic.ts`
-are the two knobs. Lowering `MAX_ROUNDS` to 1 costs you most of the loop and
-saves most of the money.
+So the **review** dropdown in Enhance mode is the knob, measured end to end on
+an eleven-bullet resume:
+
+| setting | what you get | wall clock |
+| --- | --- | --- |
+| off | draft + craft pass, no scoring | ~3 min |
+| one revision pass | score, rewrite, re-score, missing-evidence report | ~6 min |
+| thorough | up to two revision passes, early exit at 8/10 | ~10 min |
+
+`GOOD_ENOUGH` and `MAX_ROUNDS` in `lib/ai/critic.ts` set the ceiling behind it.
 
 ### Checking the reviewer
 

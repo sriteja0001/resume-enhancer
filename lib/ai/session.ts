@@ -91,6 +91,12 @@ export interface Session {
   chat: ChatTurn[];
   /** The critic loop's trace, shown rather than hidden. */
   critique: CritiqueRound[];
+  /**
+   * How many reviewer rounds this run was allowed. Recorded so a session
+   * reopened later says what produced it — a flat score after one round means
+   * something different from a flat score after three.
+   */
+  reviewRounds: number;
   exportedPath: string | null;
   demo: boolean;
 }

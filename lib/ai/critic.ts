@@ -39,7 +39,20 @@ const schema = (s: unknown) => s as unknown as Record<string, unknown>;
 
 /** Good enough to stop. Below this, another round is likely to pay for itself. */
 const GOOD_ENOUGH = 8;
-const MAX_ROUNDS = 3;
+
+/**
+ * Rounds are the expensive knob. Each one costs a review, a revision, and a
+ * blind comparison per proposed rewrite — so the ceiling is the difference
+ * between a run that takes a minute and one that takes ten. Exposed in the UI
+ * rather than buried here, because only the person waiting can judge the trade.
+ */
+export const MAX_ROUNDS = 3;
+export const DEFAULT_ROUNDS = MAX_ROUNDS;
+
+export function clampRounds(value: unknown): number {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), MAX_ROUNDS) : DEFAULT_ROUNDS;
+}
 
 export interface CriticBullet {
   id: string;
@@ -206,9 +219,11 @@ export interface LoopResult {
 }
 
 /**
- * Score, revise, keep the better version, repeat. Bounded at three rounds and
+ * Score, revise, keep the better version, repeat. Bounded by `maxRounds` and
  * stopped early once the resume is good enough — a fixed count wastes money on
  * a resume that was already strong and gives up on one that is not.
+ *
+ * `maxRounds: 0` skips the loop entirely and returns the document untouched.
  */
 export async function runCriticLoop(args: {
   doc: ResumeDoc;
@@ -217,7 +232,11 @@ export async function runCriticLoop(args: {
   charLimit: number;
   originalText: string;
   calibration: CalibrationExample[];
+  maxRounds?: number;
 }): Promise<LoopResult> {
+  const maxRounds = clampRounds(args.maxRounds ?? DEFAULT_ROUNDS);
+  if (maxRounds === 0) return { doc: args.doc, rounds: [] };
+
   const factText = new Map<string, string>();
   for (const e of args.memory.entities) {
     for (const f of e.facts) {
@@ -227,10 +246,8 @@ export async function runCriticLoop(args: {
 
   const rounds: CritiqueRound[] = [];
   let doc = args.doc;
-  let best = structuredClone(doc);
-  let bestScore = -1;
 
-  for (let round = 1; round <= MAX_ROUNDS; round++) {
+  for (let round = 1; round <= maxRounds; round++) {
     const verdict = await critique({
       doc,
       target: args.target,
@@ -238,14 +255,9 @@ export async function runCriticLoop(args: {
       calibration: args.calibration,
     });
 
-    if (verdict.overallScore > bestScore) {
-      bestScore = verdict.overallScore;
-      best = structuredClone(doc);
-    }
-
     const actionable = verdict.bullets.filter((b) => b.instruction);
     const stopping =
-      verdict.overallScore >= GOOD_ENOUGH || actionable.length === 0 || round === MAX_ROUNDS;
+      verdict.overallScore >= GOOD_ENOUGH || actionable.length === 0 || round === maxRounds;
 
     rounds.push({
       round,
@@ -364,7 +376,11 @@ export async function runCriticLoop(args: {
     doc = candidate;
   }
 
-  // The best-scoring version wins, not the last one produced.
-  const finalScore = rounds[rounds.length - 1]?.score ?? -1;
-  return { doc: finalScore >= bestScore ? doc : best, rounds };
+  // Every line on this page won a blind, forced-choice comparison against the
+  // line it replaced. An earlier draft is not restored on the strength of a
+  // holistic 1–10 score from the same model — that number is noisy enough to
+  // rate a strictly-improved page lower, and when it did, the trace still
+  // reported rewrites the returned document had silently dropped. The score
+  // decides when to STOP; the blind gate decides what the page says.
+  return { doc, rounds };
 }
